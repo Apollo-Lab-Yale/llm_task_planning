@@ -1,11 +1,13 @@
 import openai
 
+
 def set_api_key(api_key):
     """
         Initializes the OpenAI API with the provided API key.
         :param api_key: The API key for OpenAI.
     """
     openai.api_key = api_key
+
 
 def query_model(prompt, model_name="gpt-3.5-turbo", max_tokens=150):
     """
