@@ -1,7 +1,8 @@
 import re
 from llm_task_planning.problem.problem_base import ProblemBase
-from llm_task_planning.problem.utils import extract_section
-from pddl.core import Domain, Problem, Requirements, Action, Predicate, Variable
+from llm_task_planning.problem.utils import pddl_domain_definition_vhome
+from pddl.parser.domain import DomainParser
+from pddl.core import Domain, Problem, Requirements, Action, Predicate, Variable, Constant
 from pddl import parse_domain, parse_problem
 from pddl.formatter import domain_to_string, problem_to_string
 
@@ -10,8 +11,9 @@ class PDDLProblem(ProblemBase):
         super().__init__()
         self.name = name
         self.problem = None
-        self.domain = parse_domain(f"./definitions/{domain_name}-domain.pddl")
+        self.domain = DomainParser()(pddl_domain_definition_vhome)
         self.problem = None
+        self.actions = self.get_actions()
 
     def display(self):
         print(domain_to_string(self.domain))
@@ -29,7 +31,12 @@ class PDDLProblem(ProblemBase):
         self.problem.objects[obj_name].state = state
 
     def add_object(self, obj_name, obj_type):
-        self.problem.objects.extend([Variable(obj_name, obj_type)])
+        self.problem.objects.extend([Constant(obj_name, obj_type)])
+
+    def get_actions(self):
+        return [action.__str__() for action in self.domain.actions]
 
 test_problem = PDDLProblem()
-test_problem.display()
+actions = [action for action in list(test_problem.domain.actions)]
+for action in actions:
+    print(action)

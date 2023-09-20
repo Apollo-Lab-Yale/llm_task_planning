@@ -1,4 +1,5 @@
 import openai
+import time
 
 def set_api_key(api_key):
     """
@@ -7,6 +8,16 @@ def set_api_key(api_key):
     """
     openai.api_key = api_key
 
+def setup_openai():
+    file_path = "/usr/config/llm_task_planning.txt"
+    try:
+        with open(file_path, 'r') as file:
+            first_line = file.readline()
+            set_api_key(first_line.strip())
+    except FileNotFoundError:
+        print(f"The file '{file_path}' was not found.")
+    except IOError as e:
+        print(f"An error occurred while reading the file: {str(e)}")
 
 def query_model(prompt, model_name="gpt-3.5-turbo", max_tokens=150):
     """
@@ -22,3 +33,15 @@ def query_model(prompt, model_name="gpt-3.5-turbo", max_tokens=150):
         max_tokens=max_tokens
     )
     return response.choices[0].text.strip()
+
+
+start_time = time.time()
+response = openai.ChatCompletion.create(
+    model="gpt-3.5-turbo-0613",
+    messages=[
+        {"role": "user", "content": "I want a pddl domain file for the blocksworld problem "}
+    ]
+)
+
+print(response)
+print(time.time() - start_time)

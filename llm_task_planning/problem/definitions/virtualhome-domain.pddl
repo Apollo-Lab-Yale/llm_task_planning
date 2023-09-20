@@ -2,7 +2,7 @@
   (:requirements :strips :typing)
 
   (:types
-    character object room
+    character object room pose
   )
 
     (:predicates
@@ -27,6 +27,11 @@
         (RECIPIENT ?o - object)
         (SITTABLE ?o - object) ; Whether the agent can sit in this object
         (SURFACE ?o - object) ; Whether the agent can place things on this object
+        (OPEN ?o - object)
+        (CLOSED ?o - object)
+        (ON ?o - object)
+        (OFF ?o - object)
+        (AT ?char - character ?p pose)
 
         (ON ?o1 - object ?o2 - object)
         (INSIDE ?o1 - object ?o2 - object)
@@ -39,10 +44,7 @@
         (HOLDS_RH ?char - character ?o - object) ; char holds o with the right hand.
         (HOLDS_LH ?char - character ?o - object) ; char holds o with the left hand.
         (SITTING ?char - character ?o - object) ; char is sitting in o.
-        (OPEN ?o - object)
-        (CLOSED ?o - object)
-        (ON ?o - object)
-        (OFF ?o - object)
+
     )
     (:action walk
         :parameters (?char - character ?obj1 - object)
@@ -72,6 +74,18 @@
             (CLOSE ?char ?obj1)
             (FACING ?char ?obj1)
         )
+    )
+
+    (:action turnleft
+        :parameters (?char - character)
+        :precontitions (not (SITTING ?char ?o)
+        : effect (At ?char ?p)
+    )
+
+    (:action turnright
+        :parameters (?char - character)
+        :precontitions (not (SITTING ?char ?o)
+        : effect (At ?char ?p)
     )
 
     (:action sit
