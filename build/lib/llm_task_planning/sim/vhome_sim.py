@@ -3,13 +3,17 @@ from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhom
 
 
 class VirtualHomeSimEnv:
-    def __init__(self, env_idm, host="127.0.0.1", port="8080", sim=None):
+    def __init__(self, env_idm=0, host="127.0.0.1", port="8080", sim=None):
         if sim is None:
             sim = start_sim()
         self.character_added = False
         self.sim = sim
         self.comm = UnityCommunication(url=host, port=port)
         self.comm.reset(env_idm)
+        self.add_character()
+
+    def __del__(self):
+        stop_sim(self.sim)
 
     def validate_plan_syntax(self, plan):
         return plan

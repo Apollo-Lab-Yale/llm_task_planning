@@ -19,7 +19,7 @@ def setup_openai():
     except IOError as e:
         print(f"An error occurred while reading the file: {str(e)}")
 
-def query_model(prompt, model_name="gpt-3.5-turbo", max_tokens=150):
+def query_model(prompts, model_name="gpt-3.5-turbo", max_tokens=150):
     """
     Queries an OpenAI model.
     :param prompt: The input prompt for the model.
@@ -27,21 +27,13 @@ def query_model(prompt, model_name="gpt-3.5-turbo", max_tokens=150):
     :param max_tokens: Maximum number of tokens in the model's response.
     :return: Model's response as a string.
     """
-    response = openai.Completion.create(
+    response = openai.ChatCompletion.create(
         model=model_name,
-        prompt=prompt,
+        messages=[
+            {"role": "user", "content": prompt} for prompt in prompts
+        ],
         max_tokens=max_tokens
     )
-    return response.choices[0].text.strip()
+    return response
 
 
-start_time = time.time()
-response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo-0613",
-    messages=[
-        {"role": "user", "content": "I want a pddl domain file for the blocksworld problem "}
-    ]
-)
-
-print(response)
-print(time.time() - start_time)

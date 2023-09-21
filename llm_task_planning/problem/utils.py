@@ -4,7 +4,7 @@ pddl_domain_definition_vhome = '''
   (:requirements :strips :typing)
 
   (:types
-    character object room
+    character object room pose
   )
 
     (:predicates
@@ -55,6 +55,20 @@ pddl_domain_definition_vhome = '''
             (not (SITTING ?char ?o))
             (or (not (INSIDE ?obj1 ?o))
                 (INSIDE ?char ?obj1))
+            (not (HOLDS_RH ?char ?obj1))
+            (not (HOLDS_LH ?char ?obj1))
+        )
+        :effect (and
+            (CLOSE ?char ?obj1)
+            (FACING ?char ?obj1)
+        )
+    )
+    
+    (:action walk
+        :parameters (?char - character ?r - room)
+        :precondition (and
+            (not (SITTING ?char ?o))
+            (INSIDE ?char ?room)
             (not (HOLDS_RH ?char ?obj1))
             (not (HOLDS_LH ?char ?obj1))
         )

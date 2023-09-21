@@ -31,12 +31,7 @@ class PDDLProblem(ProblemBase):
         self.problem.objects[obj_name].state = state
 
     def add_object(self, obj_name, obj_type):
-        self.problem.objects.extend([Constant(obj_name, obj_type)])
+        self.problem.objects.extend([Variable(obj_name, obj_type)])
 
     def get_actions(self):
         return [action.__str__() for action in self.domain.actions]
-
-test_problem = PDDLProblem()
-actions = [action for action in list(test_problem.domain.actions)]
-for action in actions:
-    print(action)

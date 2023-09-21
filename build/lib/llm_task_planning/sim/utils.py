@@ -1,10 +1,12 @@
 import subprocess
 import time
 from numba import njit
+import threading
 UTILITY_SIM_PATH = "/home/liam/installs/virtual_home_exe/linux_exec.v2.2.4.x86_64"
 
 def start_sim():
-    subp = subprocess.Popen([f"{UTILITY_SIM_PATH}"])
+    subp = threading.Thread(subprocess.run, args=f"{UTILITY_SIM_PATH}")
+    subp.start()
     time.sleep(5)
     return subp
 def stop_sim(sim):

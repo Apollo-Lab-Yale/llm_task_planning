@@ -3,13 +3,17 @@ from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhom
 
 
 class VirtualHomeSimEnv:
-    def __init__(self, env_idm, host="127.0.0.1", port="8080", sim=None):
+    def __init__(self, env_idm=0, host="127.0.0.1", port="8080", sim=None):
         if sim is None:
             sim = start_sim()
         self.character_added = False
         self.sim = sim
         self.comm = UnityCommunication(url=host, port=port)
         self.comm.reset(env_idm)
+        self.add_character()
+
+    def __del__(self):
+        stop_sim(self.sim)
 
     def validate_plan_syntax(self, plan):
         return plan
@@ -18,11 +22,11 @@ class VirtualHomeSimEnv:
         plan = self.validate_plan_syntax(plan)
         self.comm.render_script(plan, recording=output_video)
 
-    def add_character(self, model='Chars/Male1'):
+    def add_character(self, model='Chars/Male1', room="bedroom"):
         if not self.character_added:
             self.comm.add_character_camera()
 
-        self.comm.add_character(model)
+        self.comm.add_character(model, initial_room=room)
         self.character_added = True
 
     def get_graph(self):
@@ -54,7 +58,9 @@ class VirtualHomeSimEnv:
             graph = self.get_graph()
         chars = get_characters_vhome(graph)
         visible = self.comm.get_visible_objects(self.comm.camera_count()[1]-1)[1]
-        state = chars + visible
+        visible_ids = set(visible)
+        visible = [node for node in graph["nodes"] if f"{node['id']}" in visible_ids]
+        state = chars + list(visible)
         return build_state(state)
 
 

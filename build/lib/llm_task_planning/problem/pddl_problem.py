@@ -36,7 +36,7 @@ class PDDLProblem(ProblemBase):
     def get_actions(self):
         return [action.__str__() for action in self.domain.actions]
 
-test_problem = PDDLProblem()
-actions = [action for action in list(test_problem.domain.actions)]
-for action in actions:
-    print(action)
+# test_problem = PDDLProblem()
+# actions = [action for action in list(test_problem.domain.actions)]
+# for action in actions:
+#     print(action)

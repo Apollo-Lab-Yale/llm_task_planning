@@ -35,13 +35,3 @@ def query_model(prompt, model_name="gpt-3.5-turbo", max_tokens=150):
     return response.choices[0].text.strip()
 
 
-start_time = time.time()
-response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo-0613",
-    messages=[
-        {"role": "user", "content": "I want a pddl domain file for the blocksworld problem "}
-    ]
-)
-
-print(response)
-print(time.time() - start_time)
