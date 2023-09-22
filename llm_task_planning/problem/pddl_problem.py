@@ -21,7 +21,6 @@ class PDDLProblem(ProblemBase):
             print(problem_to_string(self.problem))
         else:
             print("Problem not initialized")
-
     def setup_problem(self, name, objects, start_state, goal_state,
                       requirements=(Requirements.STRIPS, Requirements.TYPING)):
         self.problem = Problem(name, domain=self.domain, requirements=requirements,
