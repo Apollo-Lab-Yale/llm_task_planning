@@ -60,8 +60,11 @@ class VirtualHomeSimEnv:
         visible = self.comm.get_visible_objects(self.comm.camera_count()[1]-1)[1]
         visible_ids = set(visible)
         visible = [node for node in graph["nodes"] if f"{node['id']}" in visible_ids]
+        edges = [edge for edge in graph["edges"] if f"{edge['from_id']}" in visible_ids]
         state = chars + list(visible)
-        return build_state(state)
+        return build_state(state, edges)
 
 
 
+sim = VirtualHomeSimEnv()
+print(sim.get_graph()["edges"])

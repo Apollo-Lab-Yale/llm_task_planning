@@ -52,23 +52,21 @@ class PDDLPlanner:
                     if np.sqrt((char_pose[0] - obj_pose[0])**2 + (char_pose[1] - obj_pose[1])**2 + (char_pose[2] - obj_pose[2])**2) < 1:
                         near_objects[object["name"]] = object["predicates"]
                     visible_objects[object["name"]] = object["predicates"]
-        actions = self.problem.actions
+        actions = self.problem.action_strings
         goal = self.goal
 
         new_prompt = generate_action_set_prompt(actions, goal, self.abstract_state, rooms, near_objects, visible_objects)
-        print("#################################")
-        print()
         self.conversation = openai_interface.add_messages_to_conversation(new_prompt, "user", self.conversation)
-        print(self.conversation)
-        print()
-        print("#################################")
-        msg_length = sum(len(message["content"]) for message in self.conversation)
-        print(msg_length)
-        response = query_model(self.conversation)
 
+        msg_length = [len(message["content"]) for message in self.conversation]
+        response = query_model(self.conversation)
+        self.conversation.pop(-3)
+        self.conversation.pop(-3)
+        self.conversation.pop(-3)
+        print(self.conversation)
         print(response)
         self.conversation = openai_interface.add_messages_to_conversation(
-            [response["choices"][0]["message"]["content"]], "assistant", [])
+            [response["choices"][0]["message"]["content"]], "assistant", self.conversation)
 
         return extract_actions(response["choices"][0]["message"]["content"])
 

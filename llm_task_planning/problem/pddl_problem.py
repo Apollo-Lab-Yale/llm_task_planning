@@ -14,6 +14,8 @@ class PDDLProblem(ProblemBase):
         self.domain = DomainParser()(pddl_domain_definition_vhome)
         self.problem = None
         self.actions = self.get_actions()
+        self.action_strings = [action.__str__ for action in self.domain.actions]
+
 
     def display(self):
         print(domain_to_string(self.domain))
@@ -33,4 +35,13 @@ class PDDLProblem(ProblemBase):
         self.problem.objects.extend([Variable(obj_name, obj_type)])
 
     def get_actions(self):
-        return [action.__str__() for action in self.domain.actions]
+        actions = {}
+        for action in self.domain.actions:
+            actions[action.name] = action
+        return actions
+
+problem = PDDLProblem()
+# for action in problem.actions:
+#     print(problem.actions[action].precondition)
+#     print()
+

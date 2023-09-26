@@ -18,6 +18,8 @@ char_0 = Variable(f"char", "character")
 [living_room, kitchen] = variables("r kitchen", types="room")
 state = "I am in the living room."
 goal = "I need a glass of water to a user in the living room. Where should I start?"
+for action in problem.domain.actions:
+    print(action)
 planner = PDDLPlanner(problem, sim)
 planner.set_goal(goal)
 planner.set_abstract_state(state)

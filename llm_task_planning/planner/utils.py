@@ -3,9 +3,9 @@ from numba import njit
 import re
 
 def extract_actions(text):
-    pattern = r'\$\$.*?\*\*'
+    pattern = r'\$\$.*?\$\$'
     matches = re.findall(pattern, text)
-    return [match.replace('$$', '').replace('**', '').split(" ") for match in matches]
+    return [match.replace('$$', '').replace('**', '').split(" ")[1:-1] for match in matches]
 
 def generate_execution_prompt(actions, goal, abstract_state, rooms, near_objects, visible_objects):
     prompts = ["I am a robot acting in an environment and I need your help selecting my next atomic action to move towards my goal.",
@@ -26,6 +26,6 @@ def generate_action_set_prompt(actions, goal, abstract_state, rooms, near_object
                f"these are the objects I can interact with, all other visible objects need to be walked to: {near_objects}"
                f"and these are the actions I can take, note actions on objects can only be performed on objects I can see and am near: {actions}",
                f"I am trying to achieve this goal: {goal}",
-               "Which actions in my set of actions do you think should I evaluate for feasibility on which objects or rooms. I can only act on the objects that I meantioned that I can see or am near. Please provide each possible action set in the form '$$ <action> <object or room> <optional second object depending on action> **'"]
+               "Which actions in my set of actions do you think should I evaluate for feasibility on which objects or rooms. I can only act on the objects that I meantioned that I can see or am near. Please provide each possible action in the form '$$ <action> <object or room> <optional second object depending on action> $$'"]
 
     return prompts

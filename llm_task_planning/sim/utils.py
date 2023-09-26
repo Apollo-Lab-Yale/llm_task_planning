@@ -67,7 +67,7 @@ def filter_state_by_index(graph, index_dict):
     return [node for node in graph["nodes"] if f"{node['id']}" in indexes]
 
 # @njit
-def build_state(state):
+def build_state(state, edges):
     new_state = []
     for obj in state:
         new_object = {}
@@ -82,5 +82,12 @@ def build_state(state):
         new_object["id"] = obj["id"]
         new_object["name"] = obj["class_name"]
         new_object["predicates"] = predicates
+        new_object["relational_predicates"] = {}
+        for edge in edges:
+            if edge["from_id"] != new_object["id"]:
+                continue
+            if edge not in new_object["relational_predicates"]:
+                new_object["relational_predicates"][edge] = []
+            new_object["relational_predicates"][edge].append(edge["to_id"])
         new_state.append(new_object)
     return new_state
