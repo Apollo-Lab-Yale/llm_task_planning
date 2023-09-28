@@ -69,6 +69,7 @@ def filter_state_by_index(graph, index_dict):
 # @njit
 def build_state(state, edges):
     new_state = []
+    formatted_state = {}
     for obj in state:
         new_object = {}
         obj_type = obj["category"].lower()[:-1]
@@ -91,3 +92,35 @@ def build_state(state, edges):
             new_object["relational_predicates"][edge].append(edge["to_id"])
         new_state.append(new_object)
     return new_state
+
+def format_state(state, edges):
+    new_state = []
+    formatted_state = {}
+    formatted_state["objects"] = []
+    formatted_state["character"] = state[0]
+    formatted_state["predicates"] = []
+    id_map = {}
+    for obj in state:
+        new_object = {}
+        obj_type = obj["category"].lower()[:-1]
+        if obj_type not in ["character", "room"]:
+            obj_type = "object"
+        new_object["type"] = obj_type
+        position = (obj["obj_transform"]["position"], obj['obj_transform']["rotation"])
+        predicates = []
+        for pred in obj["properties"]+obj["states"]:
+            predicates.append(f"{pred} {obj['class_name']}")
+        new_object["position"] = position
+        new_object["bounding_box"] = obj["bounding_box"]
+        new_object["id"] = obj["id"]
+        new_object["name"] = obj["class_name"]
+        new_object["predicates"] = predicates
+        new_object["relational_predicates"] = {}
+        id_map[new_object["id"]] = new_object["name"]
+        new_state.append(new_object)
+    formatted_state["objects"] = new_state
+    for edge in edges:
+        if edge["to_id"] not in id_map or edge["from_id"] not in id_map:
+            continue
+        formatted_state["predicates"].append(f"{edge['relation_type']} {id_map[edge['from_id']]} {id_map[edge['to_id']]}")
+    return formatted_state

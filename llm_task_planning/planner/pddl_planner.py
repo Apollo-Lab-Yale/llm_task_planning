@@ -16,11 +16,11 @@ class PDDLPlanner:
 
     def get_next_action(self):
         state = self.sim.get_state()
-        objects = [obj for obj in state if obj["type"] == "object"]
-        rooms = [obj for obj in state if obj["type"] == "room"]
+        objects = [obj for obj in state["objects"] if obj["type"] == "object"]
+        rooms = [obj for obj in state["objects"] if obj["type"] == "room"]
         actions = self.problem.actions
         goal = self.goal
-        new_prompt = generate_prompt(actions, goal, self.abstract_state, rooms, objects)
+        new_prompt = generate_action_set_prompt(actions, goal, self.abstract_state, rooms, objects)
         print("#################################")
         print()
         self.conversation = openai_interface.add_messages_to_conversation(new_prompt, "user", self.conversation)
@@ -40,7 +40,7 @@ class PDDLPlanner:
         visible_objects = {}
         rooms = []
         char = None
-        for object in state:
+        for object in state["objects"]:
             if char is None and object["type"] == "character":
                 char = object
             elif object["type"] == "room":

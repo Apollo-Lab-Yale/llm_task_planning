@@ -1,3 +1,5 @@
+import re
+
 
 pddl_domain_definition_vhome = '''
 (define (domain virtualhome-simulator)
@@ -242,3 +244,123 @@ pddl_domain_definition_vhome = '''
     )
 )
 '''
+
+
+def predicate_func(predicate, char, obj1, obj2, active_predicates):
+    # Mapping for all the predicate functions
+    pred_map = {
+        "SITTING": lambda: f'SITTING {char} {obj2}' in active_predicates,
+        "CLOSE": lambda: f'CLOSE {char} {obj1}' in active_predicates,
+        "SITTABLE": lambda: f'SITTABLE {obj1}' in active_predicates,
+        "FACING": lambda: f'FACING {char} {obj1}' in active_predicates,
+        "INSIDE": lambda: f'INSIDE {obj1} {obj2}' in active_predicates,
+        "GRABBABLE": lambda: f'GRABBABLE {obj1}' in active_predicates,
+        "HAS_SWITCH": lambda: f'HAS_SWITCH {obj1}' in active_predicates,
+        "ON": lambda: f'ON {obj1}' in active_predicates,
+        "HOLDS_RH": lambda: f'HOLDS_RH {char} {obj1}' in active_predicates,
+        "HOLDS_LH": lambda: f'HOLDS_LH {char} {obj1}' in active_predicates,
+        "OPEN": lambda: f'OPEN {obj1}' in active_predicates,
+        "CLOSED": lambda: f'CLOSED {obj1}' in active_predicates,
+        "DRINKABLE": lambda: f'DRINKABLE {obj1}' in active_predicates,
+        "RECIPIENT": lambda: f'RECIPIENT {obj1}' in active_predicates,
+        "OFF": lambda: f'OFF {obj1}' in active_predicates,
+        "CAN_OPEN": lambda: f'CAN_OPEN {obj1}' in active_predicates
+    }
+
+    # Execute the appropriate function and return its result
+    return pred_map[predicate]()
+
+
+def evaluate_action_pddl(pddl_str, active_predicates, char, obj1, obj2 = None):
+    # Split the pddl string into predicates and logical constructs
+    tokens = [tok.strip() for tok in pddl_str.split('(') if tok]
+
+    # Lists to store evaluations
+    evaluations = []
+    negations = []  # for handling 'not' constructs
+
+    # Process each token
+    for token in tokens:
+        predicate = token.split()[0]
+
+        if predicate == 'and':
+            continue  # We'll evaluate all 'and' conditions collectively at the end
+        elif predicate == 'or':
+            # Get the sub-conditions inside the 'or' and evaluate them
+            sub_conditions = token[token.find('or') + 2:].strip().split()
+            or_results = [predicate_func(cond, char, obj1, obj2, active_predicates) for cond in sub_conditions]
+            evaluations.append(any(or_results))
+        elif predicate == 'not':
+            negations.append(token.split()[1])  # Store the predicate to be negated
+        else:
+            eval_result = predicate_func(predicate, char, obj1, obj2, active_predicates)
+            if predicate in negations:
+                evaluations.append(not eval_result)
+            else:
+                evaluations.append(eval_result)
+
+    # Combine all evaluations using 'and' operation
+    result = all(evaluations)
+    return result
+
+
+def parse_pddl_effect(effect_str, nested=False, notted=False):
+    # Handle 'and' constructs
+    if effect_str.startswith("(false)"):
+        return []
+    if effect_str.startswith("(and"):
+        inner_effects = re.findall(r'\(not \(([^()]+)\)', effect_str[4:])
+        parsed_vals = []
+        if inner_effects is not None and len(inner_effects) > 0:
+            parsed_vals = [parse_pddl_effect(inner, True, True) for inner in inner_effects]
+        inner_effects = re.findall(r'\(([^()]+)\)', effect_str[4:])
+        return parsed_vals + [parse_pddl_effect(inner, True) for inner in inner_effects if not any([inner.split(" ")[0] in parsed_val for parsed_val in parsed_vals])]
+
+    # Handle 'not' constructs
+    if effect_str.startswith("(not"):
+        inner_effect = re.match(r'\(not \((.*?)\)\)', effect_str).group(1)
+        if nested:
+            return (False,) + parse_pddl_effect(inner_effect, True, True)
+        else:
+            return [(False,) + parse_pddl_effect(inner_effect, True, True)]
+
+    # Handle simple predicates with parentheses around arguments
+    match = re.match(r'\((\w+) \?(\w+)( \?(\w+))?\)', effect_str)
+    if match:
+        predicate, obj1, _, obj2 = match.groups()
+        if nested:
+            if notted:
+                return (False, predicate, obj1, obj2)
+            else:
+                return (True, predicate, obj1, obj2)
+        else:
+            if notted:
+                return [(False, predicate, obj1, obj2)]
+
+            else:
+                return [(True, predicate, obj1, obj2)]
+
+    # Handle simple predicates without parentheses around arguments
+    match = re.match(r'not (\w+) \?(\w+) \?(\w+)', effect_str)
+    if match:
+        predicate, obj1, obj2 = match.groups()
+        if nested:
+            return (False, predicate, obj1, obj2)
+        else:
+            return [(False, predicate, obj1, obj2)]
+
+    # Handle simple predicates without parentheses around arguments
+    match = re.match(r'(\w+) \?(\w+) \?(\w+)', effect_str)
+    if match:
+        predicate, obj1, obj2 = match.groups()
+        if nested:
+            if notted:
+                return (False, predicate, obj1, obj2)
+            else:
+                return (True, predicate, obj1, obj2)
+
+        else:
+            if notted:
+                return [(False, predicate, obj1, obj2)]
+
+    raise ValueError(f"Unknown PDDL format: {effect_str}")

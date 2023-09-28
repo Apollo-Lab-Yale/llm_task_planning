@@ -1,5 +1,5 @@
 from simulation.unity_simulator.comm_unity import UnityCommunication
-from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhome, get_object, get_object_by_category, build_state
+from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhome, get_object, get_object_by_category, build_state, format_state
 
 
 class VirtualHomeSimEnv:
@@ -56,15 +56,11 @@ class VirtualHomeSimEnv:
     def get_state(self, graph=None):
         if graph is None:
             graph = self.get_graph()
-        chars = get_characters_vhome(graph)
+        chars = [graph["nodes"][0]]
         visible = self.comm.get_visible_objects(self.comm.camera_count()[1]-1)[1]
         visible_ids = set(visible)
         visible = [node for node in graph["nodes"] if f"{node['id']}" in visible_ids]
-        edges = [edge for edge in graph["edges"] if f"{edge['from_id']}" in visible_ids]
+        edges = [edge for edge in graph["edges"] if f"{edge['from_id']}" in visible_ids or f"{edge['to_id']}" in visible_ids or chars[0]["id"] == edge['from_id'] or chars[0]["id"] == edge['to_id']]
         state = chars + list(visible)
-        return build_state(state, edges)
+        return format_state(state, edges)
 
-
-
-sim = VirtualHomeSimEnv()
-print(sim.get_graph()["edges"])

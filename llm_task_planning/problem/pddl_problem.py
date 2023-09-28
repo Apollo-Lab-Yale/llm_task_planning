@@ -15,6 +15,7 @@ class PDDLProblem(ProblemBase):
         self.problem = None
         self.actions = self.get_actions()
         self.action_strings = [action.__str__ for action in self.domain.actions]
+        self.action_map = {action.__str__: action for action in self.domain.actions}
 
 
     def display(self):
@@ -40,8 +41,5 @@ class PDDLProblem(ProblemBase):
             actions[action.name] = action
         return actions
 
-problem = PDDLProblem()
-# for action in problem.actions:
-#     print(problem.actions[action].precondition)
-#     print()
+
 
