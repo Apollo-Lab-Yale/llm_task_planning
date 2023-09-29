@@ -20,6 +20,9 @@ class VirtualHomeProblem(PDDLProblem):
     def get_action_effects(self, action):
         return parse_pddl_effect(action.effect.__str__())
 
+    def build_resolution_tree(self):
+
+
 
 problem = VirtualHomeProblem()
 for action in problem.actions:

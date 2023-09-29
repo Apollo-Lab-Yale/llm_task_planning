@@ -35,6 +35,7 @@ pddl_domain_definition_vhome = '''
         (CLOSED ?o - object)
         (ON ?o - object)
         (OFF ?o - object)
+        (VISIBLE ?o - object)
         
         (AT ?char - character ?p - position)
 
@@ -59,6 +60,7 @@ pddl_domain_definition_vhome = '''
                 (INSIDE ?char ?obj1))
             (not (HOLDS_RH ?char ?obj1))
             (not (HOLDS_LH ?char ?obj1))
+            (VISIBLE ?obj1)
         )
         :effect (and
             (CLOSE ?char ?obj1)
@@ -88,6 +90,7 @@ pddl_domain_definition_vhome = '''
                 (INSIDE ?char ?obj1))
             (not (HOLDS_RH ?char ?obj1))
             (not (HOLDS_LH ?char ?obj1))
+            (VISIBLE ?obj1)
         )
         :effect (and
             (CLOSE ?char ?obj1)
@@ -101,6 +104,7 @@ pddl_domain_definition_vhome = '''
             (not (SITTING ?char ?o))
             (CLOSE ?char ?obj1)
             (SITTABLE ?obj1)
+            (VISIBLE ?obj1)
         )
         :effect (SITTING ?char ?obj1)
     )
@@ -120,6 +124,7 @@ pddl_domain_definition_vhome = '''
         (or
             (not (HOLDS_RH ?char ?any_obj))
             (not (HOLDS_LH ?char ?any_obj)))
+            (VISIBLE ?obj1)
     )
     :effect (and
         (HOLDS_RH ?char ?obj1)
@@ -137,6 +142,7 @@ pddl_domain_definition_vhome = '''
             (not (INSIDE ?obj1 ?o))
             (or (not (HOLDS_RH ?char ?any_obj))
                 (not (HOLDS_LH ?char ?any_obj)))
+            (VISIBLE ?obj1)
         )
         :effect (OPEN ?obj1)
     )
@@ -150,6 +156,7 @@ pddl_domain_definition_vhome = '''
             (not (INSIDE ?obj1 ?o))
             (or (not (HOLDS_RH ?char ?any_obj))
                 (not (HOLDS_LH ?char ?any_obj)))
+            (VISIBLE ?obj1)
         )
         :effect (CLOSED ?obj1)
     )
@@ -160,6 +167,7 @@ pddl_domain_definition_vhome = '''
             (or (HOLDS_RH ?char ?obj1)
                 (HOLDS_LH ?char ?obj1))
             (CLOSE ?char ?obj2)
+            (VISIBLE ?obj2)
         )
         :effect (and
             (ON ?obj1 ?obj2)
@@ -175,6 +183,7 @@ pddl_domain_definition_vhome = '''
                 (HOLDS_LH ?char ?obj1))
             (CLOSE ?char ?obj2)
             (not (CLOSED ?obj2))
+            (VISIBLE ?obj2)
         )
         :effect (and
             (INSIDE ?obj1 ?obj2)
@@ -189,6 +198,7 @@ pddl_domain_definition_vhome = '''
             (HAS_SWITCH ?obj1)
             (OFF ?obj1)
             (CLOSE ?char ?obj1)
+            (VISIBLE ?obj1)
         )
         :effect (ON ?obj1)
     )
@@ -199,6 +209,7 @@ pddl_domain_definition_vhome = '''
             (HAS_SWITCH ?obj1)
             (ON ?obj1)
             (CLOSE ?char ?obj1)
+            (VISIBLE ?obj1)
         )
         :effect (OFF ?obj1)
     )
@@ -209,24 +220,7 @@ pddl_domain_definition_vhome = '''
             (or (DRINKABLE ?obj1)
                 (RECIPIENT ?obj1))
             (CLOSE ?char ?obj1)
-        )
-        :effect ()
-    )
-
-    (:action touch
-        :parameters (?char - character ?obj1 - object)
-        :precondition (and
-            (CLOSE ?char ?obj1)
-            (not (INSIDE ?obj1 ?o))
-        )
-        :effect ()
-    )
-
-    (:action lookat
-        :parameters (?char - character ?obj1 - object)
-        :precondition (and
-            (FACING ?char ?obj1)
-            (not (INSIDE ?obj1 ?o))
+            (VISIBLE ?obj1)
         )
         :effect ()
     )
