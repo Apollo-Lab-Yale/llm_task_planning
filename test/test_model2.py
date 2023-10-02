@@ -1,21 +1,42 @@
-from transformers import AutoTokenizer, ConvBertForMaskedLM
-import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
-tokenizer = AutoTokenizer.from_pretrained("YituTech/conv-bert-base")
-model = ConvBertForMaskedLM.from_pretrained("YituTech/conv-bert-base")
+model_name_or_path = "TheBloke/Genz-70b-GPTQ"
+# To use a different branch, change revision
+# For example: revision="main"
+model = AutoModelForCausalLM.from_pretrained(model_name_or_path,
+                                             device_map="auto",
+                                             trust_remote_code=False,
+                                             revision="main")
 
-inputs = tokenizer("The capital of France is [MASK].", return_tensors="pt")
+tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=True)
 
-with torch.no_grad():
-    logits = model(**inputs).logits
+prompt = "Tell me about AI"
+prompt_template=f'''### User:
+{prompt}
 
-# retrieve index of [MASK]
-mask_token_index = (inputs.input_ids == tokenizer.mask_token_id)[0].nonzero(as_tuple=True)[0]
+### Assistant:
 
-predicted_token_id = logits[0, mask_token_index].argmax(axis=-1)
+'''
 
-labels = tokenizer("The capital of France is Paris.", return_tensors="pt")["input_ids"]
-# mask labels of non-[MASK] tokens
-labels = torch.where(inputs.input_ids == tokenizer.mask_token_id, labels, -100)
+print("\n\n*** Generate:")
 
-outputs = model(**inputs, labels=labels)
+input_ids = tokenizer(prompt_template, return_tensors='pt').input_ids.cuda()
+output = model.generate(inputs=input_ids, temperature=0.7, do_sample=True, top_p=0.95, top_k=40, max_new_tokens=512)
+print(tokenizer.decode(output[0]))
+
+# Inference can also be done using transformers' pipeline
+
+print("*** Pipeline:")
+pipe = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    max_new_tokens=512,
+    do_sample=True,
+    temperature=0.7,
+    top_p=0.95,
+    top_k=40,
+    repetition_penalty=1.1
+)
+
+print(pipe(prompt_template)[0]['generated_text'])

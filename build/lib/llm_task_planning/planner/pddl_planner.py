@@ -24,8 +24,8 @@ class PDDLPlanner:
                 return action
         return None
 
-    def validate_action(self, action):
+    def validate_action(self, action, ):
         state = self.sim.get_state()
-        return self.problem.
+        return self.problem.verify_action(action, state["character"])
     def set_goal(self, goal):
         self.goal = goal

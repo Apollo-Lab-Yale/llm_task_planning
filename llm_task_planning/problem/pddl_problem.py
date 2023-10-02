@@ -14,7 +14,7 @@ class PDDLProblem(ProblemBase):
         self.domain = DomainParser()(pddl_domain_definition_vhome)
         self.problem = None
         self.actions = self.get_actions()
-        self.action_strings = [action.__str__ for action in self.domain.actions]
+        self.action_strings = [action.__str__() for action in self.domain.actions]
         self.action_map = {action.__str__: action for action in self.domain.actions}
 
 

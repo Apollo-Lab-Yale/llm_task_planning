@@ -1,6 +1,7 @@
 from llm_task_planning.problem.pddl_problem import PDDLProblem
-from llm_task_planning.problem.utils import predicate_func, evaluate_action_pddl, parse_pddl_effect
-from pddl.logic.predicates import Predicate
+from llm_task_planning.problem.utils import predicate_func, evaluate_action_pddl, parse_pddl_effect, parse_pddl_action
+from llm_task_planning.problem.virtualhome.vh_resolution_tree import resolution_tree
+
 
 class VirtualHomeProblem(PDDLProblem):
     def __init__(self, name="Virtual Home Problem", domain_name="virtualhome"):
@@ -20,11 +21,15 @@ class VirtualHomeProblem(PDDLProblem):
     def get_action_effects(self, action):
         return parse_pddl_effect(action.effect.__str__())
 
-    def build_resolution_tree(self):
 
+if __name__ == "__main__":
+    problem = VirtualHomeProblem()
+    # actions = [parse_pddl_action(action) for action in problem.action_strings]
+    # goal_literals = {"HOLDS_RH ?character ?milk", "VISIBLE ?milk"}
+    # start_literals = {"VISIBLE ?milk"}  # Assuming this for the example
 
+    for action in problem.domain.actions:
+        pa = parse_pddl_action(action)
+        print(pa.name)
+        print(pa.effect)
 
-problem = VirtualHomeProblem()
-for action in problem.actions:
-    print(problem.actions[action].effect.__str__())
-    print(action, parse_pddl_effect(problem.actions[action].effect.__str__()))

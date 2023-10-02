@@ -1,6 +1,8 @@
 import re
-
-
+from pddl.logic.predicates import Predicate
+from pddl.logic.base import And, Or, Not
+from pddl.core import Action
+from pddl.logic.effects import AndEffect
 pddl_domain_definition_vhome = '''
 (define (domain virtualhome-simulator)
   (:requirements :strips :typing)
@@ -56,8 +58,7 @@ pddl_domain_definition_vhome = '''
         :parameters (?char - character ?obj1 - object)
         :precondition (and
             (not (SITTING ?char ?o))
-            (or (not (INSIDE ?obj1 ?o))
-                (INSIDE ?char ?obj1))
+            (not (INSIDE ?obj1 ?o))
             (not (HOLDS_RH ?char ?obj1))
             (not (HOLDS_LH ?char ?obj1))
             (VISIBLE ?obj1)
@@ -77,24 +78,7 @@ pddl_domain_definition_vhome = '''
             (not (HOLDS_LH ?char ?obj1))
         )
         :effect (and
-            (CLOSE ?char ?obj1)
-            (FACING ?char ?obj1)
-        )
-    )
-
-    (:action run
-        :parameters (?char - character ?obj1 - object)
-        :precondition (and
-            (not (SITTING ?char ?o))
-            (or (not (INSIDE ?obj1 ?o))
-                (INSIDE ?char ?obj1))
-            (not (HOLDS_RH ?char ?obj1))
-            (not (HOLDS_LH ?char ?obj1))
-            (VISIBLE ?obj1)
-        )
-        :effect (and
-            (CLOSE ?char ?obj1)
-            (FACING ?char ?obj1)
+            (IN ?char ?r)
         )
     )
 
@@ -116,22 +100,20 @@ pddl_domain_definition_vhome = '''
     )
 
     (:action grab
-    :parameters (?char - character ?obj1 - object)
-    :precondition (and
-        (GRABBABLE ?obj1)
-        (CLOSE ?char ?obj1)
-        (not (INSIDE ?obj1 ?o))
-        (or
+        :parameters (?char - character ?obj1 - object)
+        :precondition (and
+            (GRABBABLE ?obj1)
+            (CLOSE ?char ?obj1)
+            (not (INSIDE ?obj1 ?o))
             (not (HOLDS_RH ?char ?any_obj))
-            (not (HOLDS_LH ?char ?any_obj)))
             (VISIBLE ?obj1)
+        )
+        :effect (and
+            (HOLDS_RH ?char ?obj1)
+            (not (ON ?obj1 ?o2))
+            (not (INSIDE ?obj1 ?o3))
+        )
     )
-    :effect (and
-        (HOLDS_RH ?char ?obj1)
-        (not (ON ?obj1 ?o2))
-        (not (INSIDE ?obj1 ?o3))
-    )
-)
 
     (:action open
         :parameters (?char - character ?obj1 - object)
@@ -140,8 +122,7 @@ pddl_domain_definition_vhome = '''
             (CLOSED ?obj1)
             (CLOSE ?char ?obj1)
             (not (INSIDE ?obj1 ?o))
-            (or (not (HOLDS_RH ?char ?any_obj))
-                (not (HOLDS_LH ?char ?any_obj)))
+            (not (HOLDS_RH ?char ?any_obj))
             (VISIBLE ?obj1)
         )
         :effect (OPEN ?obj1)
@@ -154,8 +135,6 @@ pddl_domain_definition_vhome = '''
             (OPEN ?obj1)
             (CLOSE ?char ?obj1)
             (not (INSIDE ?obj1 ?o))
-            (or (not (HOLDS_RH ?char ?any_obj))
-                (not (HOLDS_LH ?char ?any_obj)))
             (VISIBLE ?obj1)
         )
         :effect (CLOSED ?obj1)
@@ -164,8 +143,7 @@ pddl_domain_definition_vhome = '''
     (:action put
         :parameters (?char - character ?obj1 - object ?obj2 - object)
         :precondition (and
-            (or (HOLDS_RH ?char ?obj1)
-                (HOLDS_LH ?char ?obj1))
+            (HOLDS_RH ?char ?obj1)
             (CLOSE ?char ?obj2)
             (VISIBLE ?obj2)
         )
@@ -179,8 +157,7 @@ pddl_domain_definition_vhome = '''
     (:action putin
         :parameters (?char - character ?obj1 - object ?obj2 - object)
         :precondition (and
-            (or (HOLDS_RH ?char ?obj1)
-                (HOLDS_LH ?char ?obj1))
+            (HOLDS_RH ?char ?obj1)
             (CLOSE ?char ?obj2)
             (not (CLOSED ?obj2))
             (VISIBLE ?obj2)
@@ -217,24 +194,23 @@ pddl_domain_definition_vhome = '''
     (:action drink
         :parameters (?char - character ?obj1 - object)
         :precondition (and
-            (or (DRINKABLE ?obj1)
-                (RECIPIENT ?obj1))
+            (DRINKABLE ?obj1)
             (CLOSE ?char ?obj1)
             (VISIBLE ?obj1)
         )
-        :effect ()
+        :effect (not (DRINKABLE ?obj1))
     )
     
     (:action turnleft
         :parameters (?char - character)
         :precondition (not (SITTING ?char ?o))
-        :effect (AT ?char ?p)
+        :effect (VISIBLE ?o)
     )
 
     (:action turnright
         :parameters (?char - character)
         :precondition (not (SITTING ?char ?o))
-        :effect (AT ?char ?p)
+        :effect (VISIBLE ?o)
     )
 )
 '''
@@ -358,3 +334,39 @@ def parse_pddl_effect(effect_str, nested=False, notted=False):
                 return [(False, predicate, obj1, obj2)]
 
     raise ValueError(f"Unknown PDDL format: {effect_str}")
+
+
+class PDDLAction:
+    def __init__(self, name, parameters, precondition, effect):
+        self.name = name
+        self.parameters = parameters
+        self.precondition = precondition
+        self.effect = effect
+
+    def satisfies(self, literal):
+        return False
+
+    def __repr__(self):
+        return self.name
+
+
+def parse_conditions(conditions, is_not=False):
+    parsed_conditions = []
+    if isinstance(conditions, Predicate):
+        values = conditions.__str__().replace("(", "").replace(")", "").split()
+        parsed_conditions = [(not is_not, values[0], values[1:])]
+    elif isinstance(conditions, tuple):
+        for condition in conditions:
+            parsed_conditions += parse_conditions(condition)
+
+    elif isinstance(conditions, And) or isinstance(conditions, AndEffect):
+        parsed_conditions = parse_conditions(conditions.operands)
+    elif isinstance(conditions, Not):
+        parsed_conditions = parse_conditions(conditions.argument, is_not or True)
+
+    return parsed_conditions
+
+def parse_pddl_action(action: Action):
+    params = [f"?{param.name}" for param in action.parameters]
+    return PDDLAction(action.name, params, parse_conditions(action.precondition), parse_conditions(action.effect))
+
