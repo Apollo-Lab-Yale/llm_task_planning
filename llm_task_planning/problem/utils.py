@@ -33,6 +33,9 @@ pddl_domain_definition_vhome = '''
         (RECIPIENT ?o - object)
         (SITTABLE ?o - object) ; Whether the agent can sit in this object
         (SURFACE ?o - object) ; Whether the agent can place things on this object
+        (OBJECT ?o)
+        (ROOM ?r)
+        (AGENT ?c)
         (OPEN ?o - object)
         (CLOSED ?o - object)
         (ON ?o - object)
@@ -61,6 +64,8 @@ pddl_domain_definition_vhome = '''
             (not (INSIDE ?obj1 ?o))
             (not (HOLDS_RH ?char ?obj1))
             (not (HOLDS_LH ?char ?obj1))
+            (OBJECT ?obj1)
+            (AGENT ?char)
             (VISIBLE ?obj1)
         )
         :effect (and
@@ -76,9 +81,13 @@ pddl_domain_definition_vhome = '''
             (INSIDE ?char ?room)
             (not (HOLDS_RH ?char ?obj1))
             (not (HOLDS_LH ?char ?obj1))
+            (ROOM ?r)
+            (AGENT ?char)
         )
         :effect (and
             (IN ?char ?r)
+            (VISIBLE ?o)
+            (OBJECT ?o)
         )
     )
 
@@ -89,6 +98,8 @@ pddl_domain_definition_vhome = '''
             (CLOSE ?char ?obj1)
             (SITTABLE ?obj1)
             (VISIBLE ?obj1)
+            (OBJECT ?obj1)
+            (AGENT ?char)
         )
         :effect (SITTING ?char ?obj1)
     )
@@ -107,6 +118,8 @@ pddl_domain_definition_vhome = '''
             (not (INSIDE ?obj1 ?o))
             (not (HOLDS_RH ?char ?any_obj))
             (VISIBLE ?obj1)
+            (OBJECT ?obj1)
+            (AGENT ?char)
         )
         :effect (and
             (HOLDS_RH ?char ?obj1)
@@ -124,8 +137,13 @@ pddl_domain_definition_vhome = '''
             (not (INSIDE ?obj1 ?o))
             (not (HOLDS_RH ?char ?any_obj))
             (VISIBLE ?obj1)
+            (OBJECT ?obj1)
+            (AGENT ?char)
         )
-        :effect (OPEN ?obj1)
+        :effect(and
+            (OPEN ?obj1)
+            (VISIBLE ?o)
+        )
     )
 
     (:action close
@@ -136,6 +154,8 @@ pddl_domain_definition_vhome = '''
             (CLOSE ?char ?obj1)
             (not (INSIDE ?obj1 ?o))
             (VISIBLE ?obj1)
+            (OBJECT ?obj1)
+            (AGENT ?char)
         )
         :effect (CLOSED ?obj1)
     )
@@ -146,6 +166,10 @@ pddl_domain_definition_vhome = '''
             (HOLDS_RH ?char ?obj1)
             (CLOSE ?char ?obj2)
             (VISIBLE ?obj2)
+            (OBJECT ?obj1)
+            (AGENT ?char)
+            (OBJECT ?obj2)
+            
         )
         :effect (and
             (ON ?obj1 ?obj2)
@@ -161,6 +185,10 @@ pddl_domain_definition_vhome = '''
             (CLOSE ?char ?obj2)
             (not (CLOSED ?obj2))
             (VISIBLE ?obj2)
+            (AGENT ?char)
+            (OBJECT ?obj2)
+            (OBJECT ?obj1)
+            
         )
         :effect (and
             (INSIDE ?obj1 ?obj2)
@@ -176,6 +204,8 @@ pddl_domain_definition_vhome = '''
             (OFF ?obj1)
             (CLOSE ?char ?obj1)
             (VISIBLE ?obj1)
+            (AGENT ?char)
+            (OBJECT ?obj1)
         )
         :effect (ON ?obj1)
     )
@@ -187,6 +217,8 @@ pddl_domain_definition_vhome = '''
             (ON ?obj1)
             (CLOSE ?char ?obj1)
             (VISIBLE ?obj1)
+            (AGENT ?char)
+            (OBJECT ?obj1)
         )
         :effect (OFF ?obj1)
     )
@@ -197,6 +229,8 @@ pddl_domain_definition_vhome = '''
             (DRINKABLE ?obj1)
             (CLOSE ?char ?obj1)
             (VISIBLE ?obj1)
+            (AGENT ?char)
+            (OBJECT ?obj1)
         )
         :effect (not (DRINKABLE ?obj1))
     )
@@ -210,6 +244,18 @@ pddl_domain_definition_vhome = '''
     (:action turnright
         :parameters (?char - character)
         :precondition (not (SITTING ?char ?o))
+        :effect (VISIBLE ?o)
+    )
+    
+    (:action scanroom
+        :parameters (?char - character ?o - object)
+        :precondition (and
+            (not (SITTING ?char ?o))
+            (CHARACTER ?char)
+            (ROOM ?r)
+            (OBJECT ?o)
+            (IN ?char ?r)
+        )
         :effect (VISIBLE ?o)
     )
 )
@@ -337,14 +383,16 @@ def parse_pddl_effect(effect_str, nested=False, notted=False):
 
 
 class PDDLAction:
-    def __init__(self, name, parameters, precondition, effect):
+    def __init__(self, name, parameters, param_types, precondition, effect, param_values=()):
         self.name = name
         self.parameters = parameters
         self.precondition = precondition
         self.effect = effect
+        self.param_values = param_values
+        self.param_types = param_types
 
-    def satisfies(self, literal):
-        return False
+    def satisfies(self, literal, lit_param_types, predicate_map):
+        return matches_action_effects(literal, self.effect, predicate_map, lit_param_types)
 
     def __repr__(self):
         return self.name
@@ -368,5 +416,33 @@ def parse_conditions(conditions, is_not=False):
 
 def parse_pddl_action(action: Action):
     params = [f"?{param.name}" for param in action.parameters]
-    return PDDLAction(action.name, params, parse_conditions(action.precondition), parse_conditions(action.effect))
+    param_types = tuple([param_type for param_type in param.type_tags][0] for param in action.parameters)
+    return PDDLAction(action.name, params, param_types, parse_conditions(action.precondition), parse_conditions(action.effect))
 
+def parse_instantiated_predicate(predicate_str):
+    parts = predicate_str.split()
+    predicate_name = parts[0]
+    parameters = parts[1:]
+    return predicate_name, parameters
+
+
+def matches_action_effects(literal_str, action_effects, predicate_map, lit_param_types):
+    predicate_name, parameters = parse_instantiated_predicate(literal_str)
+
+    for effect in action_effects:
+        effect_truth_value, effect_name, effect_parameters = effect
+        # Check if the predicate name matches
+        if predicate_name == effect_name:
+            # Check if the parameters match (assuming parameters are in order)
+            print()
+            print(lit_param_types)
+            print(predicate_map[predicate_name])
+
+            param_list = [params for params in predicate_map[predicate_name] if params == lit_param_types]
+            if len(param_list) > 0:
+                print(f"Match found for {literal_str} in {action_effects}")
+                return effect_truth_value
+    # If no match found, return False
+    # print(f"No match found {predicate_str} in {action_effects }")
+
+    return False

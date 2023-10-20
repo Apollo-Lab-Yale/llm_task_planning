@@ -1,12 +1,15 @@
 from llm_task_planning.llm import openai_interface
 from llm_task_planning.sim import VirtualHomeSimEnv
-from llm_task_planning.problem.pddl_problem import PDDLProblem
+from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
+from llm_task_planning.problem.virtualhome.vh_resolution_tree import resolve_open, resolve_holding, resolve_nonvisible, resolve_obj_off, resolve_obj_on, resolve_obj1_in_obj2, resolve_obj1_on_obj2
+from llm_task_planning.problem.utils import parse_instantiated_predicate
 from llm_task_planning.planner.utils import generate_action_set_prompt, generate_execution_prompt, extract_actions
 from llm_task_planning.llm import query_model, setup_openai
 import numpy as np
 
+
 class PDDLPlanner:
-    def __init__(self, problem : PDDLProblem, sim_env):
+    def __init__(self, problem : VirtualHomeProblem, sim_env):
         self.problem = problem
         self.sim = sim_env
         self.goal = None
@@ -34,6 +37,12 @@ class PDDLPlanner:
         print(response)
         self.conversation = openai_interface.add_messages_to_conversation([response["choices"][0]["message"]["content"]], "assistant", [])
 
+    def get_feasible_actions(self, goal):
+        state, params = parse_instantiated_predicate(goal)
+        for param in params:
+            param.replace("?", "")
+        if state == "HOLDS_RH":
+             return resolve_holding(params[1], self.sim.get_state())
     def get_action_set(self, state = None):
         state = self.sim.get_state() if state is None else state
         near_objects = {}

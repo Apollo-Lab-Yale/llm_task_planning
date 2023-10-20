@@ -1,42 +1,13 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-model_name_or_path = "TheBloke/Genz-70b-GPTQ"
-# To use a different branch, change revision
-# For example: revision="main"
-model = AutoModelForCausalLM.from_pretrained(model_name_or_path,
-                                             device_map="auto",
-                                             trust_remote_code=False,
-                                             revision="main")
+tokenizer = AutoTokenizer.from_pretrained("OpenAssistant/llama2-13b-orca-8k-3319", use_fast=False)
+model = AutoModelForCausalLM.from_pretrained("OpenAssistant/llama2-13b-orca-8k-3319", torch_dtype=torch.float16, low_cpu_mem_usage=True, device_map="auto")
 
-tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=True)
+system_message = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."
+user_prompt = "Write me a poem please"
+prompt = f"""<|system|>{system_message}</s><|prompter|>{user_prompt}</s><|assistant|>"""
+inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+output = model.generate(**inputs, do_sample=True, top_p=0.95, top_k=0, max_new_tokens=256)
+print(tokenizer.decode(output[0], skip_special_tokens=True))
 
-prompt = "Tell me about AI"
-prompt_template=f'''### User:
-{prompt}
-
-### Assistant:
-
-'''
-
-print("\n\n*** Generate:")
-
-input_ids = tokenizer(prompt_template, return_tensors='pt').input_ids.cuda()
-output = model.generate(inputs=input_ids, temperature=0.7, do_sample=True, top_p=0.95, top_k=40, max_new_tokens=512)
-print(tokenizer.decode(output[0]))
-
-# Inference can also be done using transformers' pipeline
-
-print("*** Pipeline:")
-pipe = pipeline(
-    "text-generation",
-    model=model,
-    tokenizer=tokenizer,
-    max_new_tokens=512,
-    do_sample=True,
-    temperature=0.7,
-    top_p=0.95,
-    top_k=40,
-    repetition_penalty=1.1
-)
-
-print(pipe(prompt_template)[0]['generated_text'])

@@ -1,34 +1,59 @@
 import subprocess
+import threading
 import time
 from numba import njit
 from numba.typed import Dict
 import psutil
 import os
 import signal
-
+from threading import Thread
+import sys
 UTILITY_SIM_PATH = "/home/liam/installs/virtual_home_exe/linux_exec.v2.2.4.x86_64"
 
+class SimThread(threading.Thread):
+    def __init__(self, *args, **keywords):
+        threading.Thread.__init__(self, *args, **keywords)
+        self.killed = False
+
+    def start(self):
+        self.__run_backup = self.run
+        self.run = self.__run
+        threading.Thread.start(self)
+
+    def __run(self):
+        sys.settrace(self.globaltrace)
+        self.__run_backup()
+        self.run = self.__run_backup
+
+    def globaltrace(self, frame, event, arg):
+        if event == 'call':
+            return self.localtrace
+        else:
+            return None
+
+    def localtrace(self, frame, event, arg):
+        if self.killed:
+            if event == 'line':
+                raise SystemExit()
+        return self.localtrace
+
+    def kill(self):
+        self.killed = True
+
+
 def start_sim():
-    subp = subprocess.Popen(f"{UTILITY_SIM_PATH} &", shell = True)
+    subp = SimThread(target=run_sim)
+    subp.run()
     time.sleep(5)
-    print(f"Sub process: {subp.communicate()}")
     return subp
 
-def stop_sim(sim):
-    try:
-        sim_exe = UTILITY_SIM_PATH.split("/")[-1]
-        print(f"here 1 {sim_exe}")
-        psutil.process_iter()
-        print("here2")
-        if sim_exe in (i.name() for i in psutil.process_iter() if i is not None):
-            print("here?>")
-            sim_proc = [i for i in psutil.process_iter() if i.name() == sim_exe][0]
-            os.kill(sim_proc.pid, signal.SIGTERM)
-            time.sleep(5)
-            if sim_exe in (i.name() for i in psutil.process_iter()):
-                os.kill(sim_proc.pid, signal.SIGKILL)
-    except Exception as e:
-        print(f"Failed to end simulation: {e}")
+def run_sim():
+    subp = subprocess.Popen([f"{UTILITY_SIM_PATH}"])
+
+
+def stop_sim(sim: SimThread):
+    print("killing?")
+    sim.kill()
 
 # @njit
 def get_characters_vhome(graph):
@@ -99,6 +124,7 @@ def format_state(state, edges):
     formatted_state["objects"] = []
     formatted_state["character"] = state[0]
     formatted_state["predicates"] = []
+    formatted_state["object_relations"] = []
     id_map = {}
     for obj in state:
         new_object = {}
@@ -115,6 +141,8 @@ def format_state(state, edges):
         new_object["id"] = obj["id"]
         new_object["name"] = obj["class_name"]
         new_object["predicates"] = predicates
+        new_object["properties"] = obj["properties"]
+        new_object["state"] = obj["states"]
         new_object["relational_predicates"] = {}
         id_map[new_object["id"]] = new_object["name"]
         new_state.append(new_object)
@@ -122,5 +150,7 @@ def format_state(state, edges):
     for edge in edges:
         if edge["to_id"] not in id_map or edge["from_id"] not in id_map:
             continue
-        formatted_state["predicates"].append(f"{edge['relation_type']} {id_map[edge['from_id']]} {id_map[edge['to_id']]}")
+        relation = f"{edge['relation_type']} {id_map[edge['from_id']]} {id_map[edge['to_id']]}"
+        formatted_state["predicates"].append(relation)
+        formatted_state["object_relations"].append(relation)
     return formatted_state

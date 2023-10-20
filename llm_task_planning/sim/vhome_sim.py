@@ -1,6 +1,6 @@
 from simulation.unity_simulator.comm_unity import UnityCommunication
 from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhome, get_object, get_object_by_category, build_state, format_state
-
+import sys
 
 class VirtualHomeSimEnv:
     def __init__(self, env_idm=0, host="127.0.0.1", port="8080", sim=None):
@@ -63,4 +63,3 @@ class VirtualHomeSimEnv:
         edges = [edge for edge in graph["edges"] if f"{edge['from_id']}" in visible_ids or f"{edge['to_id']}" in visible_ids or chars[0]["id"] == edge['from_id'] or chars[0]["id"] == edge['to_id']]
         state = chars + list(visible)
         return format_state(state, edges)
-

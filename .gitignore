@@ -61,3 +61,5 @@ $RECYCLE.BIN/
 
 # Jupyter Notebook
 .ipynb_checkpoints/
+
+*/__pycache__/

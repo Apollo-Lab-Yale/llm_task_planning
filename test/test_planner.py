@@ -9,6 +9,7 @@ problem = VirtualHomeProblem()
 sim = VirtualHomeSimEnv(0)
 print(problem.domain.predicates)
 state = sim.get_state()
+print(state["object_relations"])
 # for obj in state:
 #     problem.add_object()
 char = state["objects"][0]
@@ -21,14 +22,4 @@ goal = "I need a glass of water to a user in the living room. Where should I sta
 planner = PDDLPlanner(problem, sim)
 planner.set_goal(goal)
 planner.set_abstract_state(state)
-while True:
-    response = planner.get_action_set()
-    print(f"actions: {response}")
-    for action in response:
-        if action not in problem.action_map:
-            continue
-        if problem.verify_action(problem.action_map[action[0]], sim.get_state()["character"], action[1], action[2] if len(action) > 2 else None):
-            print(f"Valid: {action}")
-    new_state = input()
-    planner.set_abstract_state(new_state)
-    print("request sent")
+print(planner.get_feasible_actions("HOLDS_RH ?character ?milk"))
