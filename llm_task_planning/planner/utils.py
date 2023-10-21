@@ -30,6 +30,13 @@ def generate_action_set_prompt(actions, goal, abstract_state, rooms, near_object
 
     return prompts
 
+def generate_next_action_prompt(actions, goal, robot_state, previous_failure=""):
+    prompts = ["I am a robot acting in an environment and I need your help selecting my next atomic action to move towards my goal.",
+               robot_state,
+               f"I can take the following actions: {actions}",
+               f"Of these actions which should I take to move towards my goal of {goal}. Please provide the action in the form '$$ <action> <object or room> <optional second object depending on action> $$"]
+    return prompts
+
 
 def build_precondition_actions_dict_from_list(action_strings):
     precondition_actions = {}
@@ -116,3 +123,8 @@ def backward_chaining(goal, start, precondition_actions_dict):
 
     # If no valid sequence is found
     return None
+
+def parse_response(text):
+    pattern = r'\$\$([^$]+)\$\$'
+    matches = re.findall(pattern, text)
+    return [match.strip() for match in matches]

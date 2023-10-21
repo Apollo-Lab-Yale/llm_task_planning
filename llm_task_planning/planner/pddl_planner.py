@@ -2,8 +2,8 @@ from llm_task_planning.llm import openai_interface
 from llm_task_planning.sim import VirtualHomeSimEnv
 from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
 from llm_task_planning.problem.virtualhome.vh_resolution_tree import resolve_open, resolve_holding, resolve_nonvisible, resolve_obj_off, resolve_obj_on, resolve_obj1_in_obj2, resolve_obj1_on_obj2
-from llm_task_planning.problem.utils import parse_instantiated_predicate
-from llm_task_planning.planner.utils import generate_action_set_prompt, generate_execution_prompt, extract_actions
+from llm_task_planning.problem.utils import parse_instantiated_predicate, get_robot_state
+from llm_task_planning.planner.utils import generate_action_set_prompt, generate_execution_prompt, extract_actions, generate_next_action_prompt, parse_response
 from llm_task_planning.llm import query_model, setup_openai
 import numpy as np
 
@@ -16,14 +16,23 @@ class PDDLPlanner:
         self.abstract_state = "I am not sure."
         setup_openai()
         self.conversation = []
+        self.last_failure = ""
 
     def get_next_action(self):
         state = self.sim.get_state()
         objects = [obj for obj in state["objects"] if obj["type"] == "object"]
-        rooms = [obj for obj in state["objects"] if obj["type"] == "room"]
-        actions = self.problem.actions
+        # rooms = [obj["name"] for obj in state["objects"] if obj["type"] == "room"]
+        # state["rooms"] = rooms
+        robot_state = get_robot_state(state)
         goal = self.goal
-        new_prompt = generate_action_set_prompt(actions, goal, self.abstract_state, rooms, objects)
+        actions = set()
+        for sub_goal in goal:
+            sub_actions = self.get_feasible_actions(sub_goal, state)
+            print(sub_actions)
+            if sub_actions is None:
+                continue
+            actions = actions.union(set(sub_actions))
+        new_prompt = generate_next_action_prompt(actions, goal, robot_state, self.last_failure)
         print("#################################")
         print()
         self.conversation = openai_interface.add_messages_to_conversation(new_prompt, "user", self.conversation)
@@ -36,13 +45,15 @@ class PDDLPlanner:
 
         print(response)
         self.conversation = openai_interface.add_messages_to_conversation([response["choices"][0]["message"]["content"]], "assistant", [])
+        return parse_response(response["choices"][0]["message"]["content"])
 
-    def get_feasible_actions(self, goal):
-        state, params = parse_instantiated_predicate(goal)
+    def get_feasible_actions(self, goal, state):
+        relation, params = parse_instantiated_predicate(goal)
         for param in params:
             param.replace("?", "")
-        if state == "HOLDS_RH":
-             return resolve_holding(params[1], self.sim.get_state())
+        if relation == "HOLDS_RH":
+             return resolve_holding(params[1], state)
+
     def get_action_set(self, state = None):
         state = self.sim.get_state() if state is None else state
         near_objects = {}

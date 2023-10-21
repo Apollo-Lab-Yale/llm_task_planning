@@ -57,9 +57,12 @@ class VirtualHomeSimEnv:
         if graph is None:
             graph = self.get_graph()
         chars = [graph["nodes"][0]]
+        rooms = [obj["class_name"] for obj in graph["nodes"] if obj["category"].lower()[:-1] == "room"]
         visible = self.comm.get_visible_objects(self.comm.camera_count()[1]-1)[1]
         visible_ids = set(visible)
         visible = [node for node in graph["nodes"] if f"{node['id']}" in visible_ids]
         edges = [edge for edge in graph["edges"] if f"{edge['from_id']}" in visible_ids or f"{edge['to_id']}" in visible_ids or chars[0]["id"] == edge['from_id'] or chars[0]["id"] == edge['to_id']]
         state = chars + list(visible)
-        return format_state(state, edges)
+        formatted_state = format_state(state, edges)
+        formatted_state["rooms"] = rooms
+        return formatted_state

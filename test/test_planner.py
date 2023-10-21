@@ -18,8 +18,7 @@ in_pred = [predicate for predicate in problem.domain.predicates if predicate.nam
 char_0 = Variable(f"char", "character")
 [living_room, kitchen] = variables("r kitchen", types="room")
 state = "I am in the living room."
-goal = "I need a glass of water to a user in the living room. Where should I start?"
+goal = {"HOLDS_RH ?character ?milk"}
 planner = PDDLPlanner(problem, sim)
 planner.set_goal(goal)
-planner.set_abstract_state(state)
-print(planner.get_feasible_actions("HOLDS_RH ?character ?milk"))
+print(planner.get_next_action())

@@ -16,14 +16,14 @@ def check_close(goal_object, object_relations):
                     and f"?{goal_object}" in parse_instantiated_predicate(literal)[1] for literal in object_relations])
 
 def check_holding(goal_object, object_relations):
-    return any([parse_instantiated_predicate(literal)[0] == "HOLDING_RH"
+    return any([parse_instantiated_predicate(literal)[0] == "HOLDS_RH"
                 and "?character" in parse_instantiated_predicate(literal)[1]
                 and f"?{goal_object}" in parse_instantiated_predicate(literal)[1] for literal in object_relations])
 
 def get_obj_in_hand(object_relations):
     holding =  [parse_instantiated_predicate(literal)[1][1] 
                 for literal in object_relations 
-                if parse_instantiated_predicate(literal)[0] == "HOLDING_RH"
+                if parse_instantiated_predicate(literal)[0] == "HOLDS_RH"
                 and "?character" in parse_instantiated_predicate(literal)[1]]
     return holding[0] if len(holding) > 0 else None
 
@@ -41,12 +41,16 @@ def get_top_n(d, n):
     return top_list
 
 def resolve_holding(goal_object, state):
+    print(state)
+    print(goal_object)
     obj_in_hand = get_obj_in_hand(state["object_relations"])
-    if obj_in_hand == goal_object:
-        return None
     if obj_in_hand is not None:
+        print(obj_in_hand)
+        if obj_in_hand == goal_object:
+            return None
         return [f"put ?{obj_in_hand} ?{get_surfaces(state)[0]}"]
     if not any(goal_object == object["name"] for object in state["objects"]):
+        print("should be looking for visible")
         return resolve_nonvisible(goal_object, state)
     if not check_close(goal_object, state["object_relations"]):
         return [f"walk ?character ?{goal_object}"]
@@ -106,10 +110,10 @@ def resolve_obj_off(goal_object, state):
 
 def resolve_nonvisible(goal_object, state):
     # validate_location -> move to most likely location
-    room_literal = [literal for literal in state["object_relations"] if parse_instantiated_predicate(literal)[0] == "INSIDE" and "?character" in parse_instantiated_predicate(literal)[1]][0]
+    room_literal = [literal for literal in state["object_relations"] if parse_instantiated_predicate(literal)[0] == "INSIDE" and "character" in parse_instantiated_predicate(literal)[1]][0]
     current_room = str(parse_instantiated_predicate(room_literal)[1][1])
     current_room = current_room.replace('?', '')
-    rooms = [literal for literal in state["predicates"] if parse_instantiated_predicate(literal)[0] in ["ROOM"]]
+    rooms = state.get("rooms", [])
     resolution_actions = [f"scanroom ?character ?{current_room}"]
     can_open = []
     can_move = []
@@ -117,10 +121,13 @@ def resolve_nonvisible(goal_object, state):
         if room != current_room:
             resolution_actions.append(f"walk ?character ?{room}")
     for object in state["objects"]:
+        if not object["type"] == "object":
+            continue
         is_close = check_close(object["name"], state["object_relations"])
         action = None
+
         if not is_close:
-            resolution_actions.append(f"walk ?character ?{object['name']})")
+            resolution_actions.append(f"walk ?character ?{object['name']}")
             continue
         if "CAN_OPEN" in object["properties"]:
             can_open.append(object)
