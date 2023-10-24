@@ -154,3 +154,30 @@ def format_state(state, edges):
         formatted_state["predicates"].append(relation)
         formatted_state["object_relations"].append(relation)
     return formatted_state
+
+def handle_scan_room():
+    pass
+
+def translate_action_for_sim(action : str, state):
+    action = action.replace("?", "").split(" ")
+    sim_action = f"<char0> [{action[0]}]"
+    if action[0] == "scanroom":
+        return handle_scan_room()
+    for param in action[1:]:
+        print(param)
+        if param == "character":
+            continue
+        (obj_class, id) = param.split("_")
+        object_match = [object for object in state["objects"] if object["name"] == obj_class and object["id"] == int(id)]
+        print(object_match, obj_class, id)
+        goal = object_match[0] if len(object_match) > 0 else None
+        if goal is None:
+            room_match = [room for room in state["rooms"] if room["class_name"] == obj_class and room["id"] == int(id)]
+            print(room_match)
+            goal = room_match[0]
+            goal["name"] = goal["class_name"]
+        sim_action += f" <{goal['name'].split('_')[0]}> ({goal['id']})"
+    return sim_action
+        
+
+

@@ -32,9 +32,11 @@ def generate_action_set_prompt(actions, goal, abstract_state, rooms, near_object
 
 def generate_next_action_prompt(actions, goal, robot_state, previous_failure=""):
     prompts = ["I am a robot acting in an environment and I need your help selecting my next atomic action to move towards my goal.",
-               robot_state,
-               f"I can take the following actions: {actions}",
-               f"Of these actions which should I take to move towards my goal of {goal}. Please provide the action in the form '$$ <action> <object or room> <optional second object depending on action> $$"]
+               robot_state]
+    if previous_failure != "":
+        prompts += [previous_failure]
+    prompts += [f"I can take the following actions: {actions}",
+               f"Of these actions which should I take to move towards my goal of {goal}. include an explaination for your action selection. Please provide the action in the format '$$ <action> <object or room> <optional second object depending on action> $$."]
     return prompts
 
 

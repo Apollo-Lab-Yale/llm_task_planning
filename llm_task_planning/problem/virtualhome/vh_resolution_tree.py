@@ -12,8 +12,8 @@ N_OBJECTS = 5
 
 def check_close(goal_object, object_relations):
     return any([parse_instantiated_predicate(literal)[0] == "CLOSE"
-                    and "?character" in parse_instantiated_predicate(literal)[1]
-                    and f"?{goal_object}" in parse_instantiated_predicate(literal)[1] for literal in object_relations])
+                    and "character" in parse_instantiated_predicate(literal)[1]
+                    and f"{goal_object.split('_')[0]}" in parse_instantiated_predicate(literal)[1] for literal in object_relations])
 
 def check_holding(goal_object, object_relations):
     return any([parse_instantiated_predicate(literal)[0] == "HOLDS_RH"
@@ -104,12 +104,14 @@ def resolve_obj_on(goal_object, state):
 def resolve_obj_off(goal_object, state):
     if not any(goal_object == object["name"] for object in state["objects"]):
         return resolve_nonvisible(goal_object, state)
+    obj_id = [object for object in state["objects"]]
     if not check_close(goal_object, state["object_relations"]):
         return [f"walk ?character ?{goal_object} "]
     return [f"switchon ?character ?{goal_object}"]
 
 def resolve_nonvisible(goal_object, state):
     # validate_location -> move to most likely location
+    print(state["object_relations"])
     room_literal = [literal for literal in state["object_relations"] if parse_instantiated_predicate(literal)[0] == "INSIDE" and "character" in parse_instantiated_predicate(literal)[1]][0]
     current_room = str(parse_instantiated_predicate(room_literal)[1][1])
     current_room = current_room.replace('?', '')
@@ -118,8 +120,8 @@ def resolve_nonvisible(goal_object, state):
     can_open = []
     can_move = []
     for room in rooms:
-        if room != current_room:
-            resolution_actions.append(f"walk ?character ?{room}")
+        if room["class_name"] != current_room:
+            resolution_actions.append(f"walk ?character ?{room['class_name']}_{room['id']}")
     for object in state["objects"]:
         if not object["type"] == "object":
             continue
@@ -127,17 +129,16 @@ def resolve_nonvisible(goal_object, state):
         action = None
 
         if not is_close:
-            resolution_actions.append(f"walk ?character ?{object['name']}")
+            resolution_actions.append(f"walk ?character ?{object['name']}_{object['id']}")
             continue
         if "CAN_OPEN" in object["properties"]:
             can_open.append(object)
-            if is_close:
-                action = f"open ?character ?{object['name']}"
+            action = f"open ?character ?{object['name']}_{object['id']}"
             resolution_actions.append(action)
         if "MOVABLE" in object["properties"]:
             can_move.append(object)
             if is_close:
-                resolution_actions.append(f"move ?character ?{object}")
+                resolution_actions.append(f"move ?character ?{object['name']}_{object['id']}")
     return resolution_actions
 
 

@@ -33,11 +33,18 @@ def query_model(messages, model_name="gpt-3.5-turbo"):
     return response
 
 def add_messages_to_conversation(messages, speaker, conversation):
+    total_message_size = 0
     for message in messages:
         conversation.append({
             "role": speaker,
             "content": message[:4096]
         })
+        total_message_size += len(message[:4096])
+    if total_message_size > 15000:
+        convo_length = len(conversation)
+        while total_message_size > 13000 and len(conversation) > convo_length - 10:
+            removed_msg = conversation.pop(0)
+            total_message_size -= len(removed_msg["content"])
     return conversation
 
 
