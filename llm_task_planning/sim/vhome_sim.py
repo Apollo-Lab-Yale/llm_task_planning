@@ -68,6 +68,14 @@ class VirtualHomeSimEnv:
         visible = [node for node in graph["nodes"] if f"{node['id']}" in visible_ids or node["class_name"] == chars[0]["class_name"]]
         edges = [edge for edge in graph["edges"] if f"{edge['from_id']}" in visible_ids or f"{edge['to_id']}" in visible_ids or chars[0]["id"] == edge['from_id'] or chars[0]["id"] == edge['to_id']]
         state = chars + list(visible)
-        formatted_state = format_state(state, edges)
+        formatted_state = format_state(state, edges, graph)
         formatted_state["rooms"] = rooms
         return formatted_state
+
+    def handle_scan_room(self, goal_object):
+        for i in range(12):
+            self.comm.render_script(["<char0> [turnleft]"])
+            state = self.get_state()
+            if any([object["name"] == goal_object.split("_")[0] for object in state["objects"]]):
+                return True
+        return False

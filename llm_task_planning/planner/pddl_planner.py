@@ -1,6 +1,6 @@
 from llm_task_planning.llm import openai_interface
 from llm_task_planning.sim import VirtualHomeSimEnv
-from llm_task_planning.sim.utils import translate_action_for_sim
+from llm_task_planning.sim.utils import translate_action_for_sim, handle_scan_room
 from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
 from llm_task_planning.problem.virtualhome.vh_resolution_tree import resolve_open, resolve_holding, resolve_nonvisible, resolve_obj_off, resolve_obj_on, resolve_obj1_in_obj2, resolve_obj1_on_obj2, resolve_close
 from llm_task_planning.problem.utils import parse_instantiated_predicate, get_robot_state
@@ -13,13 +13,16 @@ class PDDLPlanner:
     def __init__(self, problem : VirtualHomeProblem, sim_env: VirtualHomeSimEnv):
         self.problem = problem
         self.sim = sim_env
-        self.goal = None
+        self.goal = set()
+        self.nl_goal = set()
         self.abstract_state = "I am not sure."
         setup_openai()
         self.conversation = []
+        self.actions_taken = []
         self.last_failure = ""
         self.max_llm_retry = 5
         self.max_action_steps = 20
+        self.failure_resolutions = []
 
     def get_next_action(self):
         for _ in range(self.max_llm_retry):
@@ -32,7 +35,8 @@ class PDDLPlanner:
                 if sub_actions is None:
                     continue
                 actions = actions.union(set(sub_actions))
-            new_prompt = generate_next_action_prompt(actions, goal, robot_state, self.last_failure)
+            new_prompt = generate_next_action_prompt(actions, self.nl_goal, robot_state, self.last_failure, self.actions_taken)
+            self.last_failure = ""
             print("#################################")
             print()
             self.conversation = openai_interface.add_messages_to_conversation(new_prompt, "user", self.conversation)
@@ -53,34 +57,50 @@ class PDDLPlanner:
             self.conversation = openai_interface.add_messages_to_conversation([response["choices"][0]["message"]["content"]], "assistant", self.conversation)
             selected_action = parse_response(response["choices"][0]["message"]["content"])
             if len(selected_action) == 0:
+                self.last_failure = "I failed to complete the previous action because I failed to parse it. Make sure the action is in the form requested."
                 continue
             selected_action = selected_action[0]
             if selected_action not in actions:
-                self.last_failure = f"I failed to complete the previous action {selected_action}, because it was not in the set actions I provided."
+                self.last_failure = f"I failed to complete the previous action {selected_action}, because it was not in the set actions I provided. Only select actions that exactly match an entry in the set I provid."
                 continue
             return selected_action, state
 
+    # todo - add failure detection
     def solve(self):
         for _ in range(self.max_action_steps):
-            action, state = self.get_next_action()
-            if action is None:
+            ret = self.get_next_action()
+            if ret is None:
                 continue
-            sim_action = translate_action_for_sim(action, state)
-            print(f"Executing script: {sim_action}")
-            success, msg = self.sim.comm.render_script([sim_action])
+            (action, state) = ret
+            print(f"returned action: {action}")
+            if "scanroom" in action:
+                print(f"Executing action: {action}")
+                if self.sim.handle_scan_room(action.split()[-1].replace("?","")):
+                    self.last_failure = f"I failed to find {action.split()[-1].replace('?','')} after performing scanroom. The object is not visible from my current location."
+                continue
+            sim_action_list = translate_action_for_sim(action, state)
+            print(f"Executing script: {sim_action_list}")
+
+            success, msg = self.sim.comm.render_script(sim_action_list,frame_rate=10, camera_mode=["THIRD_PERSON"])
             if not success:
                 print(msg)
+                self.last_failure = f"I failed to perform action: {action} due to blocking condition."
             state = self.sim.get_state()
+            self.actions_taken.append(action)
             if self.check_satisfied(state["predicates"]):
+                print("Task success!")
                 return True
+        print("Max actions taken, task failed.")
         return False
 
 
     def check_satisfied(self, predicates):
-        for sub_goal in self.goal:
-            if sub_goal in predicates:
-                self.goal.pop(sub_goal)
+        print(predicates)
+        for predicate in predicates:
+            if predicate in self.goal:
+                self.goal.remove(predicate)
         return len(self.goal) == 0
+
     def get_feasible_actions(self, goal, state):
         relation, params = parse_instantiated_predicate(goal)
         for param in params:
@@ -136,8 +156,9 @@ class PDDLPlanner:
 
         return extract_actions(response["choices"][0]["message"]["content"])
 
-    def set_goal(self, goal):
+    def set_goal(self, goal, nl_goal):
         self.goal = goal
+        self.nl_goal = nl_goal
 
     def set_abstract_state(self, state):
         self.abstract_state = state

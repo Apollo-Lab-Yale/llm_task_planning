@@ -39,12 +39,9 @@ def add_messages_to_conversation(messages, speaker, conversation):
             "role": speaker,
             "content": message[:4096]
         })
-        total_message_size += len(message[:4096])
-    if total_message_size > 15000:
-        convo_length = len(conversation)
-        while total_message_size > 13000 and len(conversation) > convo_length - 10:
-            removed_msg = conversation.pop(0)
-            total_message_size -= len(removed_msg["content"])
+    total_message_size = sum(len(message["content"]) for message in conversation)
+    if total_message_size > 8000:
+        conversation = conversation[len(conversation)//2:]
     return conversation
 
 

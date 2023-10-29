@@ -19,7 +19,7 @@ def generate_execution_prompt(actions, goal, abstract_state, rooms, near_objects
     return prompts
 
 def generate_action_set_prompt(actions, goal, abstract_state, rooms, near_objects, visible_objects):
-    prompts = ["I am a robot acting in an environment and I need your help selecting my next atomic action to move towards my goal.",
+    prompts = ["I am a character acting in an environment and I need your help selecting my next atomic action to move towards my goal.",
                f"this is what I know about my state: {abstract_state}",
                f"these are the rooms I know about but may not be all the rooms: {rooms}",
                f"these are the objects I can see and their predicates but may not be all the objects: {visible_objects}"[:4096],
@@ -30,13 +30,17 @@ def generate_action_set_prompt(actions, goal, abstract_state, rooms, near_object
 
     return prompts
 
-def generate_next_action_prompt(actions, goal, robot_state, previous_failure=""):
-    prompts = ["I am a robot acting in an environment and I need your help selecting my next atomic action to move towards my goal.",
+def generate_next_action_prompt(actions, goal, robot_state, previous_failure="", previous_actions = []):
+    prompts = ["I am a robot called character acting in an environment and I need your help selecting my next atomic action from a limited set to move towards my goal.",
                robot_state]
     if previous_failure != "":
         prompts += [previous_failure]
-    prompts += [f"I can take the following actions: {actions}",
-               f"Of these actions which should I take to move towards my goal of {goal}. include an explaination for your action selection. Please provide the action in the format '$$ <action> <object or room> <optional second object depending on action> $$."]
+    if len(previous_actions) > 0:
+        prompts += [f"I have completed the following actions: {previous_actions[-10:]}"]
+
+    prompts += [f"Right now I can only perform the following actions: {actions}"[:3000],
+                f"Do not perform scanroom twice in a row as it will result in the same effect.",
+               f"Of these actions which should I take to move towards my goal of {goal}. include an explaination for your action selection. Please refrain from getting stuck in action loops and provide your selected action in the format '$$ <action> <object, room, or character> <optional second object depending on action> $$."]
     return prompts
 
 

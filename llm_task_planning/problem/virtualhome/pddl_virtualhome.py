@@ -19,9 +19,6 @@ class VirtualHomeProblem(PDDLProblem):
             if evaluate_action_pddl(action.precondition.__str__(), active_preds, char, target1, target2):
                 valid_actions.append((action, char, target1, target2))
 
-if __name__ == "__main__":
-    problem = VirtualHomeProblem()
-    # actions = [parse_pddl_action(action) for action in problem.action_strings]
 
 
 

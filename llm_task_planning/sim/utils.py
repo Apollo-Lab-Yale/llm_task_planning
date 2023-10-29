@@ -118,7 +118,7 @@ def build_state(state, edges):
         new_state.append(new_object)
     return new_state
 
-def format_state(state, edges):
+def format_state(state, edges, graph):
     new_state = []
     formatted_state = {}
     formatted_state["objects"] = []
@@ -126,6 +126,25 @@ def format_state(state, edges):
     formatted_state["predicates"] = []
     formatted_state["object_relations"] = []
     id_map = {}
+    for edge in edges:
+        if (edge["to_id"] not in id_map or edge["from_id"] not in id_map) and (edge["to_id"] != formatted_state["character"]["id"] and edge["from_id"] != formatted_state["character"]["id"]):
+            continue
+        new_node = None
+        if edge["from_id"] not in id_map:
+            new_node = get_node_from_id(graph, edge["from_id"])
+            id_map[new_node["id"]] = new_node["class_name"]
+        if new_node is not None and "HOLDS" in edge["relation_type"]:
+            state.append(new_node)
+            new_node = None
+        if edge["to_id"] not in id_map:
+            new_node = get_node_from_id(graph, edge["to_id"])
+            id_map[new_node["id"]] = new_node["class_name"]
+        if new_node is not None and "HOLDS" in edge["relation_type"]:
+            state.append(new_node)
+            new_node = None
+        relation = f"{edge['relation_type']} {id_map[edge['from_id']]} {id_map[edge['to_id']]}"
+        formatted_state["predicates"].append(relation)
+        formatted_state["object_relations"].append(relation)
     for obj in state:
         new_object = {}
         obj_type = obj["category"].lower()[:-1]
@@ -147,37 +166,49 @@ def format_state(state, edges):
         id_map[new_object["id"]] = new_object["name"]
         new_state.append(new_object)
     formatted_state["objects"] = new_state
-    for edge in edges:
-        if edge["to_id"] not in id_map or edge["from_id"] not in id_map:
-            continue
-        relation = f"{edge['relation_type']} {id_map[edge['from_id']]} {id_map[edge['to_id']]}"
-        formatted_state["predicates"].append(relation)
-        formatted_state["object_relations"].append(relation)
+
     return formatted_state
 
-def handle_scan_room():
+def get_node_from_id(graph, id):
+    for node in graph["nodes"]:
+        if id == node["id"]:
+            return node
+
+def handle_scan_room(goal_object):
     pass
+
+
 
 def translate_action_for_sim(action : str, state):
     action = action.replace("?", "").split(" ")
+    if "look" in action[0]:
+        action[0] = action[0].replace('look', 'turn')
     sim_action = f"<char0> [{action[0]}]"
+
     if action[0] == "scanroom":
         return handle_scan_room()
     for param in action[1:]:
-        print(param)
         if param == "character":
             continue
-        (obj_class, id) = param.split("_")
+        split_param = param.split("_")
+        obj_class, id = None, None
+        if len(split_param) <= 1:
+            matches = [object for object in state["objects"] if object["name"] == split_param[0]]
+            obj_class, id = matches[0]["name"], matches[0]["id"]
+        else:
+            obj_class, id = split_param
         object_match = [object for object in state["objects"] if object["name"] == obj_class and object["id"] == int(id)]
-        print(object_match, obj_class, id)
         goal = object_match[0] if len(object_match) > 0 else None
         if goal is None:
-            room_match = [room for room in state["rooms"] if room["class_name"] == obj_class and room["id"] == int(id)]
-            print(room_match)
+            room_match = [room for room in state["rooms"] if room["class_name"] == obj_class]
             goal = room_match[0]
             goal["name"] = goal["class_name"]
         sim_action += f" <{goal['name'].split('_')[0]}> ({goal['id']})"
-    return sim_action
+    action_list = [sim_action]
+    if "turn" in sim_action:
+        action_list *= 2
+
+    return action_list
         
 
 
