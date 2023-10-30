@@ -1,6 +1,7 @@
 from simulation.unity_simulator.comm_unity import UnityCommunication
 from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhome, get_object, get_object_by_category, build_state, format_state
 import sys
+import time
 
 class VirtualHomeSimEnv:
     def __init__(self, env_idm=0, host="127.0.0.1", port="8080", sim=None):
@@ -75,7 +76,8 @@ class VirtualHomeSimEnv:
     def handle_scan_room(self, goal_object):
         for i in range(12):
             self.comm.render_script(["<char0> [turnleft]"])
+            time.sleep(0.5)
             state = self.get_state()
-            if any([object["name"] == goal_object.split("_")[0] for object in state["objects"]]):
+            if any([object["name"].split('_')[0] == goal_object.split("_")[0] for object in state["objects"]]):
                 return True
         return False

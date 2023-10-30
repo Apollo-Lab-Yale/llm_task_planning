@@ -19,7 +19,7 @@ def setup_openai():
     except IOError as e:
         print(f"An error occurred while reading the file: {str(e)}")
 
-def query_model(messages, model_name="gpt-3.5-turbo"):
+def query_model(messages, model_name="gpt-4"):
     """
     Queries an OpenAI model.
     :param prompt: The input prompt for the model.
@@ -29,7 +29,8 @@ def query_model(messages, model_name="gpt-3.5-turbo"):
     """
     response = openai.ChatCompletion.create(
         model=model_name,
-        messages=messages)
+        messages=messages,
+        timeout = 5)
     return response
 
 def add_messages_to_conversation(messages, speaker, conversation):

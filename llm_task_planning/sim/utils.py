@@ -127,7 +127,7 @@ def format_state(state, edges, graph):
     formatted_state["object_relations"] = []
     id_map = {}
     for edge in edges:
-        if (edge["to_id"] not in id_map or edge["from_id"] not in id_map) and (edge["to_id"] != formatted_state["character"]["id"] and edge["from_id"] != formatted_state["character"]["id"]):
+        if (edge["to_id"] not in id_map or edge["from_id"] not in id_map) and (edge["to_id"] != formatted_state["character"]["id"] and edge["from_id"] != formatted_state["character"]["id"] and "HOLDS" not in edge["relation_type"]):
             continue
         new_node = None
         if edge["from_id"] not in id_map:
@@ -142,7 +142,7 @@ def format_state(state, edges, graph):
         if new_node is not None and "HOLDS" in edge["relation_type"]:
             state.append(new_node)
             new_node = None
-        relation = f"{edge['relation_type']} {id_map[edge['from_id']]} {id_map[edge['to_id']]}"
+        relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
         formatted_state["predicates"].append(relation)
         formatted_state["object_relations"].append(relation)
     for obj in state:
@@ -154,7 +154,7 @@ def format_state(state, edges, graph):
         position = (obj["obj_transform"]["position"], obj['obj_transform']["rotation"])
         predicates = []
         for pred in obj["properties"]+obj["states"]:
-            predicates.append(f"{pred} {obj['class_name']}")
+            predicates.append(f"{pred} {obj['class_name']}_{obj['id']}")
         new_object["position"] = position
         new_object["bounding_box"] = obj["bounding_box"]
         new_object["id"] = obj["id"]
@@ -173,10 +173,8 @@ def get_node_from_id(graph, id):
     for node in graph["nodes"]:
         if id == node["id"]:
             return node
-
-def handle_scan_room(goal_object):
-    pass
-
+def get_sim_object(name, nodes, location=None):
+    return [node for node in nodes if node["class_name"] == name][-1]
 
 
 def translate_action_for_sim(action : str, state):
@@ -184,9 +182,6 @@ def translate_action_for_sim(action : str, state):
     if "look" in action[0]:
         action[0] = action[0].replace('look', 'turn')
     sim_action = f"<char0> [{action[0]}]"
-
-    if action[0] == "scanroom":
-        return handle_scan_room()
     for param in action[1:]:
         if param == "character":
             continue

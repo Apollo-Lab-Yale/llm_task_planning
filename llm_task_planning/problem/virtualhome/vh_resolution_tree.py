@@ -19,8 +19,8 @@ resolution_map = {
 
 def check_close(goal_object, object_relations):
     return any([parse_instantiated_predicate(literal)[0] == "CLOSE"
-                    and "character" in parse_instantiated_predicate(literal)[1]
-                    and f"{goal_object.split('_')[0]}" in parse_instantiated_predicate(literal)[1] for literal in object_relations])
+                    and "character_1" in parse_instantiated_predicate(literal)[1]
+                    and f"{goal_object}" in parse_instantiated_predicate(literal)[1] for literal in object_relations])
 
 def check_holding(goal_object, object_relations):
     return any([(parse_instantiated_predicate(literal)[0] == "HOLDS_RH" or parse_instantiated_predicate(literal)[0] == "HOLDS_LH")
@@ -59,7 +59,7 @@ def resolve_holding(goal_object, state):
 
     if not any(goal_object.split('_')[0] == object["name"].split('_')[0] for object in state["objects"]):
         return resolve_nonvisible(goal_object, state)
-    goal_object = [[f"{object['name']}",f"{object['id']}"] for object in state["objects"] if object["name"] == goal_object.split('_')[0]][0]
+    goal_object = [[f"{object['name']}", f"{object['id']}"] for object in state["objects"] if object["name"] == goal_object.split('_')[0]][0]
     if not check_close(goal_object[0], state["object_relations"]):
         return [f"walk ?character ?{goal_object[0]}_{goal_object[1]}"]
 
@@ -149,7 +149,6 @@ def resolve_nonvisible(goal_object, state):
             continue
         is_close = check_close(object["name"], state["object_relations"])
         action = None
-
         if not is_close:
             resolution_actions.append(f"walk ?character ?{object['name']}_{object['id']}")
             continue
@@ -160,11 +159,126 @@ def resolve_nonvisible(goal_object, state):
             else:
                 action = f"open ?character ?{object['name']}_{object['id']}"
             resolution_actions.append(action)
-        # if "GRABBABLE" in object["properties"]:
-        #     can_move.append(object)
-        #     if is_close:
-        #         resolution_actions.append(f"grab ?character ?{object['name']}_{object['id']}")
     return resolution_actions
+
+def add_to_dict(d, key, val_type=set):
+    if key not in d:
+        d[key] = val_type()
+    return d
+
+
+predicates = [
+    "CAN_OPEN",
+    "CLOTHES",
+    "CONTAINERS",
+    "COVER_OBJECT",
+    "CREAM",
+    "CUTTABLE",
+    "DRINKABLE",
+    "EATABLE",
+    "GRABBABLE",
+    "HANGABLE",
+    "HAS_PAPER",
+    "HAS_PLUG",
+    "HAS_SWITCH",
+    "LIEABLE",
+    "LOOKABLE",
+    "MOVABLE",
+    "POURABLE",
+    "READABLE",
+    "RECIPIENT",
+    "SITTABLE",
+    "SURFACE",
+    "ON",
+    "OFF",
+    "OPEN",
+    "CLOSED"
+    "FAR",
+    "CLOSE"
+]
+
+def get_all_valid_actions(state, goals):
+    containers = []
+    goal_objects = set()
+    object_properties_states = {}
+    valid_actions = []
+    object_properties_states["HOLDS"] = set()
+    object_properties_states["CLOSE"] = set()
+    rooms = [f"{room['class_name']}_{room['id']}" for room in state["rooms"]]
+    goal_actions = []
+    for goal in goals:
+        relation, params = parse_instantiated_predicate(goal)
+        for param in params:
+            if param not in rooms and "character" not in param:
+                goal_objects.add(param)
+    for predicate in predicates:
+        object_properties_states[predicate] = set()
+    for edge in state["object_relations"]:
+        relation, params = parse_instantiated_predicate(edge)
+        if "HOLDS" in relation:
+            if relation not in object_properties_states:
+                object_properties_states[relation] = set()
+            object_properties_states["HOLDS"].add(params[1])
+    for object in state["objects"]:
+        is_close = check_close(f"{object['name']}_{object['id']}", state["object_relations"])
+        if is_close:
+            object_properties_states["CLOSE"].add(f"{object['name']}_{object['id']}")
+
+            for property in object["properties"]:
+                if property not in object_properties_states:
+                    object_properties_states[property] = set()
+                object_properties_states[property].add(f"{object['name']}_{object['id']}")
+            for s in object["state"]:
+                if s not in object_properties_states:
+                    object_properties_states[s] = set()
+                object_properties_states[s].add(f"{object['name']}_{object['id']}")
+        else:
+            if "FAR" not in object_properties_states:
+                object_properties_states["FAR"] = set()
+            object_properties_states["FAR"].add(f"{object['name']}_{object['id']}")
+    for object in object_properties_states.get("CLOSE", set()):
+        is_goal = object in goal_objects
+        if object in object_properties_states["HOLDS"]:
+            for surface in object_properties_states["SURFACE"]:
+                valid_actions.append(f"put {object} {surface}")
+                if is_goal:
+                    goal_actions.append(valid_actions[-1])
+            for storage in object_properties_states["CONTAINERS"].intersection(object_properties_states["OPEN"]):
+                valid_actions.append(f"putin {object} {storage}")
+                if is_goal:
+                    goal_actions.append(valid_actions[-1])
+        if object in object_properties_states["GRABBABLE"].difference(object_properties_states["HOLDS"]):
+            valid_actions.append(f"grab character {object}")
+            if is_goal:
+                goal_actions.append(valid_actions[-1])
+        if object in object_properties_states["CAN_OPEN"]:
+            if object in object_properties_states["OPEN"]:
+                valid_actions.append(f"close character {object}")
+                if is_goal:
+                    goal_actions.append(valid_actions[-1])
+            else:
+                valid_actions.append(f"open character {object}")
+                if is_goal:
+                    goal_actions.append(valid_actions[-1])
+    for object in object_properties_states.get("FAR", set()):
+        is_goal = object in goal_objects
+        valid_actions.append(f"walk character {object}")
+        if is_goal:
+            goal_actions.append(valid_actions[-1])
+
+    for room in rooms:
+        valid_actions.append(f"walk character {room}")
+    goals_in_close = []
+    goals_in_far = []
+    for goal in goals:
+        relation, params = parse_instantiated_predicate(goal)
+        for param in params:
+            if param not in rooms and param not in object_properties_states["CLOSE"].union(object_properties_states["FAR"]):
+                valid_actions.append(f"scanroom character {param}")
+                goal_actions.append(valid_actions[-1])
+    return valid_actions, goal_actions
+
+
 
 
 class ResolutionNode:
