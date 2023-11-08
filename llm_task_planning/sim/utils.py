@@ -8,6 +8,8 @@ import os
 import signal
 from threading import Thread
 import sys
+from copy import deepcopy
+
 UTILITY_SIM_PATH = "/home/liam/installs/virtual_home_exe/linux_exec.v2.2.4.x86_64"
 
 class SimThread(threading.Thread):
@@ -54,6 +56,7 @@ def run_sim():
 def stop_sim(sim: SimThread):
     print("killing?")
     sim.kill()
+    time.sleep(1.0)
 
 # @njit
 def get_characters_vhome(graph):
@@ -155,6 +158,7 @@ def format_state(state, edges, graph):
         predicates = []
         for pred in obj["properties"]+obj["states"]:
             predicates.append(f"{pred} {obj['class_name']}_{obj['id']}")
+        formatted_state["predicates"] += predicates
         new_object["position"] = position
         new_object["bounding_box"] = obj["bounding_box"]
         new_object["id"] = obj["id"]
@@ -167,6 +171,12 @@ def format_state(state, edges, graph):
         new_state.append(new_object)
     formatted_state["objects"] = new_state
 
+    for edge in edges:
+        if edge['from_id'] not in id_map or edge['to_id'] not in id_map:
+            continue
+        relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
+        formatted_state["predicates"].append(relation)
+        formatted_state["object_relations"].append(relation)
     return formatted_state
 
 def get_node_from_id(graph, id):
@@ -204,6 +214,11 @@ def translate_action_for_sim(action : str, state):
         action_list *= 2
 
     return action_list
-        
 
+def get_relevant_relations(relations, not_relevant = ("CLOSE", "FACING"), rooms=()):
+    filter_relations = [relation for relation in relations if relation.split()[0] in not_relevant or any(room in relation.split() for room in rooms)]
+    filtered_relations = deepcopy(relations)
+    for relation in filter_relations:
+        filtered_relations.remove(relation)
+    return filtered_relations
 

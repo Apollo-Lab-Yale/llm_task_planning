@@ -3,16 +3,18 @@ from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhom
 import sys
 import time
 
+
 class VirtualHomeSimEnv:
     def __init__(self, env_idm=0, host="127.0.0.1", port="8080", sim=None):
         if sim is None:
             sim = start_sim()
         self.character_added = False
         self.sim = sim
-        self.comm = UnityCommunication(url=host, port=port)
+        self.comm = UnityCommunication(url=host, port=port, no_graphics=True)
         self.comm.reset(env_idm)
         self.add_character()
         self.camera_index = self.get_camera_index()
+        self.set_view(self.camera_index)
 
     def __del__(self):
         stop_sim(self.sim)
@@ -81,3 +83,18 @@ class VirtualHomeSimEnv:
             if any([object["name"].split('_')[0] == goal_object.split("_")[0] for object in state["objects"]]):
                 return True
         return False
+
+    def check_cooked(self):
+        state = self.get_graph()
+        microwave = [node for node in state["nodes"] if node["class_name"] == "microwave"][0]
+        stove = [node for node in state["nodes"] if node["class_name"] == "stove"][0]
+        cooked = []
+        for edge in state["edges"]:
+            if edge["relation_type"] == "INSIDE":
+                if edge["to_id"] == stove["id"] and "ON" in stove["states"] and "CLOSED" in stove["states"]:
+                    cooked.append(edge["from_id"])
+                elif edge["to_id"] == microwave["id"] and "ON" in microwave["states"] and "CLOSED" in microwave["states"]:
+                    cooked.append(edge["from_id"])
+        return [node for node in state["nodes"] if node["id"] in cooked]
+
+

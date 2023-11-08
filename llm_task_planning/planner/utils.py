@@ -7,20 +7,49 @@ def extract_actions(text):
     matches = re.findall(pattern, text)
     return [match.replace('$$', '').replace('**', '').split(" ")[1:-1] for match in matches]
 
-def generate_next_action_prompt(actions, goal_actions, goal, robot_state, previous_failure="", previous_actions = []):
-    prompts = ["I am a robot called character acting in an environment and I need your help selecting my next atomic action from a limited set to move towards my goal.",
+
+def generate_next_action_prompt_combined(actions, goal_actions, goal, robot_state, previous_failure="", previous_actions = [], relevant_relations=()):
+    prompts = "I am a robot called character acting in a household environment and I need your help selecting my next atomic action from a limited set to move towards my goal."+\
+              robot_state
+    if previous_failure != "":
+        prompts += previous_failure
+    if len(previous_actions) > 0:
+        prompts += f"I have completed the following actions: {previous_actions[-5:]}"
+
+    prompts += f"Right now I can only perform the following actions: {actions}"+\
+                f"This is how these objects relate to each other: {relevant_relations}"+\
+                f"NOTE the following actions involve a goal object: {goal_actions}" if len(goal_actions) > 0 else ""+\
+                f"The action scanroom if available allows me to visually scan a room to see if an object is visible. Do not perform consecutive scanroom actions."
+    prompts += f"Of these actions which should I take to move towards my goal of {goal}. include an explaination for your action selection. Please refrain from getting stuck in action loops and provide your selected action in the format '$$ <action> <object, room, (including id tag) or character> <optional second object (including id tag) depending on action> $$."
+    return [prompts]
+
+def generate_next_action_prompt(actions, goal_actions, goal, robot_state, previous_failure="", previous_actions = [], relevant_relations=(), item_states=[]):
+    prompts = ["I am a robot called character acting in a household environment and I need your help selecting my next atomic action from a limited set to move towards my goal.",
                robot_state]
+    if len(item_states) > 0:
+        prompts+=item_states
     if previous_failure != "":
         prompts += [previous_failure]
     if len(previous_actions) > 0:
         prompts += [f"I have completed the following actions: {previous_actions[-10:]}"]
 
     prompts += [f"Right now I can only perform the following actions: {actions}"[:3000],
+                f"This is how these objects relate to each other: {relevant_relations}",
                 f"NOTE the following actions involve a goal object: {goal_actions}" if len(goal_actions) > 0 else "",
                 f"The action scanroom if available allows me to visually scan a room to see if an object is visible. Do not perform consecutive scanroom actions.",
                f"Of these actions which should I take to move towards my goal of {goal}. include an explaination for your action selection. Please refrain from getting stuck in action loops and provide your selected action in the format '$$ <action> <object, room, (including id tag) or character> <optional second object (including id tag) depending on action> $$."]
     return prompts
 
+def generate_goal_prompt(nl_goal):
+    return [f"Break the following goal into algorithmic sub goals for a robot acting in an environment with very limited information: {nl_goal} return your response in a python list of sub goals, excluding all other text"]
+
+def generate_cooked_prompt(cooked):
+    cooked_prompts = set()
+    # if type(cooked) not in [list, tuple] and cooked is not None:
+    #     cooked = [cooked]
+    for item in cooked:
+        cooked_prompts.add(f"The {item['class_name']}_{item['id']} is cooked!")
+    return cooked_prompts
 
 def build_precondition_actions_dict_from_list(action_strings):
     precondition_actions = {}

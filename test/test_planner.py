@@ -13,13 +13,14 @@ sim = VirtualHomeSimEnv(0)
 
 sim.comm.activate_physics()
 planner = PDDLPlanner(problem, sim)
-goal = 'salmon'
-goal_location1 = 'fridge'
-goal_storage = "bowl"
+goal = 'cereal'
+goal_location1 = 'livingroom'
+goal_storage = "dishbowl"
 goal_obj = get_sim_object(goal, sim.get_graph()["nodes"])
 goal_loc_obj = get_sim_object(goal_location1, sim.get_graph()["nodes"])
+goal_storage_obj = get_sim_object(goal_storage, sim.get_graph()["nodes"])
 # goal_container_object = get_sim_object(goal_storage, sim.get_graph()["nodes"])
-goal_lit = {f"INSIDE {goal_obj['class_name']}_{goal_obj['id']} {goal_loc_obj['class_name']}_{goal_loc_obj['id']}"}
-nl_goal = {"Put the salmon in the fridge"}
+goal_lit = {f"INSIDE {goal_obj['class_name']}_{goal_obj['id']} {goal_loc_obj['class_name']}_{goal_loc_obj['id']}", f"INSIDE {goal_obj['class_name']}_{goal_obj['id']} {goal_storage_obj['class_name']}_{goal_storage_obj['id']}"}
+nl_goal = {"Bring some cereal in a bowl to the livingroom."}
 planner.set_goal(goal_lit, nl_goal)
 print(planner.solve())

@@ -167,7 +167,7 @@ def add_to_dict(d, key, val_type=set):
     return d
 
 
-predicates = [
+PREDICATES = (
     "CAN_OPEN",
     "CLOTHES",
     "CONTAINERS",
@@ -195,23 +195,24 @@ predicates = [
     "CLOSED"
     "FAR",
     "CLOSE"
-]
+)
 
-def get_all_valid_actions(state, goals):
+def get_all_valid_actions(state, goals, current_room="", didScanRoom=False):
     containers = []
     goal_objects = set()
     object_properties_states = {}
-    valid_actions = []
+    valid_actions = ["turnleft character", "turnright character"]
     object_properties_states["HOLDS"] = set()
     object_properties_states["CLOSE"] = set()
     rooms = [f"{room['class_name']}_{room['id']}" for room in state["rooms"]]
     goal_actions = []
+    print(state["predicates"])
     for goal in goals:
         relation, params = parse_instantiated_predicate(goal)
         for param in params:
             if param not in rooms and "character" not in param:
                 goal_objects.add(param)
-    for predicate in predicates:
+    for predicate in PREDICATES:
         object_properties_states[predicate] = set()
     for edge in state["object_relations"]:
         relation, params = parse_instantiated_predicate(edge)
@@ -239,11 +240,11 @@ def get_all_valid_actions(state, goals):
     for object in object_properties_states.get("CLOSE", set()):
         is_goal = object in goal_objects
         if object in object_properties_states["HOLDS"]:
-            for surface in object_properties_states["SURFACE"]:
+            for surface in object_properties_states["SURFACE"].intersection(object_properties_states["CLOSE"]):
                 valid_actions.append(f"put {object} {surface}")
                 if is_goal:
                     goal_actions.append(valid_actions[-1])
-            for storage in object_properties_states["CONTAINERS"].intersection(object_properties_states["OPEN"]):
+            for storage in object_properties_states["CONTAINERS"].intersection(object_properties_states["OPEN"]).intersection(object_properties_states["CLOSE"]):
                 valid_actions.append(f"putin {object} {storage}")
                 if is_goal:
                     goal_actions.append(valid_actions[-1])
@@ -254,12 +255,18 @@ def get_all_valid_actions(state, goals):
         if object in object_properties_states["CAN_OPEN"]:
             if object in object_properties_states["OPEN"]:
                 valid_actions.append(f"close character {object}")
-                if is_goal:
-                    goal_actions.append(valid_actions[-1])
             else:
                 valid_actions.append(f"open character {object}")
-                if is_goal:
-                    goal_actions.append(valid_actions[-1])
+            if is_goal:
+                goal_actions.append(valid_actions[-1])
+        if object in object_properties_states["HAS_SWITCH"]:
+            if object in object_properties_states["ON"]:
+                valid_actions.append(f"switchoff character {object}")
+            elif object in object_properties_states.get("CLOSED", set()):
+                valid_actions.append(f"switchon character {object}")
+            if is_goal:
+                goal_actions.append(valid_actions[-1])
+
     for object in object_properties_states.get("FAR", set()):
         is_goal = object in goal_objects
         valid_actions.append(f"walk character {object}")
@@ -267,15 +274,17 @@ def get_all_valid_actions(state, goals):
             goal_actions.append(valid_actions[-1])
 
     for room in rooms:
-        valid_actions.append(f"walk character {room}")
+        if room != current_room:
+            valid_actions.append(f"walk character {room}")
     goals_in_close = []
     goals_in_far = []
     for goal in goals:
         relation, params = parse_instantiated_predicate(goal)
         for param in params:
-            if param not in rooms and param not in object_properties_states["CLOSE"].union(object_properties_states["FAR"]):
+            if param not in rooms and param not in object_properties_states.get("CLOSED", set()).union(object_properties_states["FAR"]):
                 valid_actions.append(f"scanroom character {param}")
-                goal_actions.append(valid_actions[-1])
+                if not didScanRoom:
+                    goal_actions.append(valid_actions[-1])
     return valid_actions, goal_actions
 
 
