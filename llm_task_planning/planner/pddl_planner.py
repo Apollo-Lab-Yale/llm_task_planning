@@ -2,15 +2,16 @@ from llm_task_planning.llm import openai_interface
 from llm_task_planning.sim import VirtualHomeSimEnv
 from llm_task_planning.sim.utils import translate_action_for_sim, get_relevant_relations
 from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
-from llm_task_planning.problem.virtualhome.vh_resolution_tree import resolve_open, resolve_holding, resolve_nonvisible, resolve_obj_off, resolve_obj_on, resolve_obj1_in_obj2, resolve_obj1_on_obj2, resolve_close, get_all_valid_actions
+from llm_task_planning.problem.virtualhome.vh_resolution_tree import get_all_valid_actions, resolve_nonvisible, resolve_not_holding, resolve_off, resolve_on, resolve_place_object, resolve_not_ontop, resolve_not_inside, get_object_properties_and_states, resolve_open, resolve_closed
 from llm_task_planning.problem.utils import parse_instantiated_predicate, get_robot_state
-from llm_task_planning.planner.utils import extract_actions, generate_next_action_prompt, parse_response, generate_goal_prompt, generate_cooked_prompt
+from llm_task_planning.planner.utils import extract_actions, generate_next_action_prompt, parse_response, generate_goal_prompt, generate_cooked_prompt, generate_next_action_prompt_combined, \
+    generate_next_action_prompt_short
 from llm_task_planning.llm import query_model, setup_openai
 import numpy as np
 
 
 class PDDLPlanner:
-    def __init__(self, problem : VirtualHomeProblem, sim_env: VirtualHomeSimEnv, retain_memory=False):
+    def __init__(self, problem : VirtualHomeProblem, sim_env: VirtualHomeSimEnv, retain_memory=True):
         self.problem = problem
         self.sim = sim_env
         self.goal = set()
@@ -26,6 +27,7 @@ class PDDLPlanner:
         self.max_action_steps = 20
         self.failure_resolutions = []
         self.robot_location = ""
+        self.start_state = None
 
     def get_next_action(self):
         for _ in range(self.max_llm_retry):
@@ -35,16 +37,16 @@ class PDDLPlanner:
             self.robot_location = location
             goal = self.goal
             actions = set()
-            # for sub_goal in goal:
-                # sub_actions = self.get_feasible_actions(sub_goal, state)
-                # if sub_actions is None:
-                #     continue
-                # actions = actions.union(set(sub_actions))
-            all_actions, goal_actions = get_all_valid_actions(state, self.goal, current_room=location,
-                                                  didScanRoom="scanroom" in self.actions_taken[-1] if len(self.actions_taken) > 0 else False)
+            for sub_goal in goal:
+                sub_actions = self.get_feasible_actions(sub_goal, state)
+                if sub_actions is None:
+                    continue
+                actions = actions.union(set(sub_actions))
+            # all_actions, goal_actions = get_all_valid_actions(state, self.goal, current_room=location,
+            #                                       didScanRoom="scanroom" in self.actions_taken[-1] if len(self.actions_taken) > 0 else False)
             rooms = [f"{room['class_name']}_{room['id']}" for room in state["rooms"]]
             relevant_relations = get_relevant_relations(state["object_relations"], rooms=rooms)
-            new_prompt = generate_next_action_prompt(all_actions, goal_actions, self.nl_goal, robot_state, self.last_failure, self.actions_taken, relevant_relations, [f"{self.item_states}"])
+            new_prompt = generate_next_action_prompt(actions, [], self.nl_goal, robot_state, self.last_failure, self.actions_taken, relevant_relations, [f"{self.item_states}"])
             self.last_failure = ""
             print("#################################")
             print()
@@ -70,13 +72,14 @@ class PDDLPlanner:
                 self.last_failure = "I failed to complete the previous action because I failed to parse it. Make sure the action is in the form requested."
                 continue
             selected_action = selected_action[0]
-            if selected_action not in all_actions:
+            if selected_action not in actions:
                 self.last_failure = f"I failed to complete the previous action {selected_action}, because it was not in the set actions I provided. Only select actions that exactly match an entry in the set I provide."
                 continue
             return selected_action, state
 
     # todo - add failure detection
     def solve(self):
+        self.start_state = self.sim.get_graph()
         for _ in range(self.max_action_steps):
             ret = self.get_next_action()
             if ret is None:
@@ -96,7 +99,7 @@ class PDDLPlanner:
                 print(msg)
                 self.last_failure = f"I failed to perform action: {action} due to blocking condition."
             state = self.sim.get_state()
-            self.actions_taken.append(f"{action} executed in the {self.robot_location}")
+            self.actions_taken.append(f"{action}")
             if self.check_satisfied(state["predicates"]):
                 print("Task success!")
                 return True
@@ -113,22 +116,24 @@ class PDDLPlanner:
 
     def get_feasible_actions(self, goal, state):
         relation, params = parse_instantiated_predicate(goal)
+        obj_preds = get_object_properties_and_states(state)
+        rooms = state["room_names"]
         for param in params:
             param.replace("?", "")
         if relation == "HOLDS_RH":
-            return resolve_holding(params[1], state)
+            return resolve_not_holding(params[1], obj_preds, rooms)
         if relation == "INSIDE":
-            return resolve_obj1_in_obj2(params[0], params[1], state)
+            return resolve_not_inside(params[0], params[1], obj_preds, rooms)
         if relation == "ON":
             if len(params) == 1:
-                return resolve_obj_on(params[0], state)
-            return resolve_obj1_on_obj2(params[0], params[1], state)
+                return resolve_off(params[0], obj_preds, rooms)
+            return resolve_not_ontop(params[0], params[1], obj_preds, rooms)
         if relation == "OFF":
-            return resolve_obj_off(params[0], state)
+            return resolve_on(params[0], obj_preds, rooms)
         if relation == "OPEN":
-            return resolve_open(params[0], state)
+            return resolve_closed(params[0], obj_preds, rooms)
         if relation == "CLOSED":
-            return resolve_close(params[0], state)
+            return resolve_open(params[0], obj_preds, rooms)
 
     def set_goal(self, goal, nl_goal):
         self.goal = goal

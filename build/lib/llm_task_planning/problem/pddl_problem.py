@@ -14,6 +14,9 @@ class PDDLProblem(ProblemBase):
         self.domain = DomainParser()(pddl_domain_definition_vhome)
         self.problem = None
         self.actions = self.get_actions()
+        self.action_strings = [action.__str__() for action in self.domain.actions]
+        self.action_map = {action.__str__: action for action in self.domain.actions}
+
 
     def display(self):
         print(domain_to_string(self.domain))
@@ -21,7 +24,6 @@ class PDDLProblem(ProblemBase):
             print(problem_to_string(self.problem))
         else:
             print("Problem not initialized")
-
     def setup_problem(self, name, objects, start_state, goal_state,
                       requirements=(Requirements.STRIPS, Requirements.TYPING)):
         self.problem = Problem(name, domain=self.domain, requirements=requirements,
@@ -31,12 +33,13 @@ class PDDLProblem(ProblemBase):
         self.problem.objects[obj_name].state = state
 
     def add_object(self, obj_name, obj_type):
-        self.problem.objects.extend([Constant(obj_name, obj_type)])
+        self.problem.objects.extend([Variable(obj_name, obj_type)])
 
     def get_actions(self):
-        return [action.__str__() for action in self.domain.actions]
+        actions = {}
+        for action in self.domain.actions:
+            actions[action.name] = action
+        return actions
 
-# test_problem = PDDLProblem()
-# actions = [action for action in list(test_problem.domain.actions)]
-# for action in actions:
-#     print(action)
+
+

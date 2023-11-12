@@ -10,7 +10,7 @@ from threading import Thread
 import sys
 from copy import deepcopy
 
-UTILITY_SIM_PATH = "/home/liam/installs/virtual_home_exe/linux_exec.v2.2.4.x86_64"
+UTILITY_SIM_PATH = "/home/liam/installs/virtual_home_exe/linux_exec.v2.3.0.x86_64"
 
 class SimThread(threading.Thread):
     def __init__(self, *args, **keywords):

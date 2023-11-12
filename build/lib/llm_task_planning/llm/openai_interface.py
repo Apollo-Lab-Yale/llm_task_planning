@@ -19,7 +19,7 @@ def setup_openai():
     except IOError as e:
         print(f"An error occurred while reading the file: {str(e)}")
 
-def query_model(prompt, model_name="gpt-3.5-turbo", max_tokens=150):
+def query_model(messages, model_name="gpt-4-1106-preview"):
     """
     Queries an OpenAI model.
     :param prompt: The input prompt for the model.
@@ -27,11 +27,20 @@ def query_model(prompt, model_name="gpt-3.5-turbo", max_tokens=150):
     :param max_tokens: Maximum number of tokens in the model's response.
     :return: Model's response as a string.
     """
-    response = openai.Completion.create(
+    response = openai.ChatCompletion.create(
         model=model_name,
-        prompt=prompt,
-        max_tokens=max_tokens
-    )
-    return response.choices[0].text.strip()
+        messages=messages,
+        timeout = 5)
+    return response
 
-
+def add_messages_to_conversation(messages, speaker, conversation):
+    total_message_size = 0
+    for message in messages:
+        conversation.append({
+            "role": speaker,
+            "content": str(message[:4096])
+        })
+    total_message_size = sum(len(message["content"]) for message in conversation)
+    if total_message_size > 8000:
+        conversation = conversation[len(conversation)//2:]
+    return conversation

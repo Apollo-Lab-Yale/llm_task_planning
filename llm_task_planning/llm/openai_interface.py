@@ -19,7 +19,7 @@ def setup_openai():
     except IOError as e:
         print(f"An error occurred while reading the file: {str(e)}")
 
-def query_model(messages, model_name="gpt-4-1106-preview"):
+def query_model(messages, model_name="gpt-3.5-turbo-1106"):
     """
     Queries an OpenAI model.
     :param prompt: The input prompt for the model.
