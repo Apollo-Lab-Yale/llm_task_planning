@@ -8,7 +8,9 @@ import os
 import signal
 from threading import Thread
 import sys
-UTILITY_SIM_PATH = "/home/liam/installs/virtual_home_exe/linux_exec.v2.2.4.x86_64"
+from copy import deepcopy
+
+UTILITY_SIM_PATH = "/home/liam/installs/virtual_home_exe/linux_exec.v2.3.0.x86_64"
 
 class SimThread(threading.Thread):
     def __init__(self, *args, **keywords):
@@ -54,6 +56,7 @@ def run_sim():
 def stop_sim(sim: SimThread):
     print("killing?")
     sim.kill()
+    time.sleep(1.0)
 
 # @njit
 def get_characters_vhome(graph):
@@ -127,7 +130,7 @@ def format_state(state, edges, graph):
     formatted_state["object_relations"] = []
     id_map = {}
     for edge in edges:
-        if (edge["to_id"] not in id_map or edge["from_id"] not in id_map) and (edge["to_id"] != formatted_state["character"]["id"] and edge["from_id"] != formatted_state["character"]["id"]):
+        if (edge["to_id"] not in id_map or edge["from_id"] not in id_map) and (edge["to_id"] != formatted_state["character"]["id"] and edge["from_id"] != formatted_state["character"]["id"] and "HOLDS" not in edge["relation_type"]):
             continue
         new_node = None
         if edge["from_id"] not in id_map:
@@ -142,7 +145,7 @@ def format_state(state, edges, graph):
         if new_node is not None and "HOLDS" in edge["relation_type"]:
             state.append(new_node)
             new_node = None
-        relation = f"{edge['relation_type']} {id_map[edge['from_id']]} {id_map[edge['to_id']]}"
+        relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
         formatted_state["predicates"].append(relation)
         formatted_state["object_relations"].append(relation)
     for obj in state:
@@ -154,7 +157,8 @@ def format_state(state, edges, graph):
         position = (obj["obj_transform"]["position"], obj['obj_transform']["rotation"])
         predicates = []
         for pred in obj["properties"]+obj["states"]:
-            predicates.append(f"{pred} {obj['class_name']}")
+            predicates.append(f"{pred} {obj['class_name']}_{obj['id']}")
+        formatted_state["predicates"] += predicates
         new_object["position"] = position
         new_object["bounding_box"] = obj["bounding_box"]
         new_object["id"] = obj["id"]
@@ -167,16 +171,20 @@ def format_state(state, edges, graph):
         new_state.append(new_object)
     formatted_state["objects"] = new_state
 
+    for edge in edges:
+        if edge['from_id'] not in id_map or edge['to_id'] not in id_map:
+            continue
+        relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
+        formatted_state["predicates"].append(relation)
+        formatted_state["object_relations"].append(relation)
     return formatted_state
 
 def get_node_from_id(graph, id):
     for node in graph["nodes"]:
         if id == node["id"]:
             return node
-
-def handle_scan_room(goal_object):
-    pass
-
+def get_sim_object(name, nodes, location=None):
+    return [node for node in nodes if node["class_name"] == name][-1]
 
 
 def translate_action_for_sim(action : str, state):
@@ -184,9 +192,6 @@ def translate_action_for_sim(action : str, state):
     if "look" in action[0]:
         action[0] = action[0].replace('look', 'turn')
     sim_action = f"<char0> [{action[0]}]"
-
-    if action[0] == "scanroom":
-        return handle_scan_room()
     for param in action[1:]:
         if param == "character":
             continue
@@ -209,6 +214,11 @@ def translate_action_for_sim(action : str, state):
         action_list *= 2
 
     return action_list
-        
 
+def get_relevant_relations(relations, not_relevant = ("CLOSE", "FACING"), rooms=()):
+    filter_relations = [relation for relation in relations if relation.split()[0] in not_relevant or any(room in relation.split() for room in rooms)]
+    filtered_relations = deepcopy(relations)
+    for relation in filter_relations:
+        filtered_relations.remove(relation)
+    return filtered_relations
 

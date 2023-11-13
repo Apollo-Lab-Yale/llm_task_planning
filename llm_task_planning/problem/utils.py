@@ -445,10 +445,10 @@ def matches_action_effects(literal_str, action_effects, predicate_map, lit_param
     return False
 
 CHAR_RELATIONS = ("INSIDE", "HOLDS_RH")
-
 def get_robot_state(state, robot = "character", relations=CHAR_RELATIONS):
     robot_state = ""
     holding = False
+    location = None
     for literal in state["object_relations"]:
         if robot in literal:
             relation, params = parse_instantiated_predicate(literal)
@@ -458,6 +458,7 @@ def get_robot_state(state, robot = "character", relations=CHAR_RELATIONS):
                     robot_state += f" I am holding {params[1]}."
                 else:
                     robot_state += f" I am inside the {params[1]}."
+                    location = params[1].replace('.', '')
     if not holding:
         robot_state += " I am not holding anything."
-    return robot_state
+    return robot_state, location
