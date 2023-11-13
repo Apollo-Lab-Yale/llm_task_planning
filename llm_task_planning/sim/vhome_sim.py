@@ -85,7 +85,7 @@ class VirtualHomeSimEnv:
             self.comm.render_script(["<char0> [turnleft]"])
             time.sleep(0.5)
             state = self.get_state()
-            if any([f"{object['name']}" == goal_object.split('_')[0] for object in state["objects"]]):
+            if any([f"{object['name']}_{object['id']}" == goal_object for object in state["objects"]]):
                 return True
         return False
 

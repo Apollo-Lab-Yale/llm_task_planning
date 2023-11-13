@@ -27,6 +27,21 @@ def get_put_away_plates_goal(sim):
     goals = [f"INSIDE {plate['class_name']}_{plate['id']} {cabinet_node['class_name']}_{cabinet_node['id']}" for plate in plates]
     return goals
 
+def get_put_salmon_in_fridge_goal(sim):
+    graph = sim.get_graph()
+    salmon = [node for node in graph["nodes"] if node["class_name"] == "salmon"][0]
+    fridge = [node for node in graph["nodes"] if node["class_name"] == "fridge"][0]
+    goals = [f"INSIDE {salmon['class_name']}_{salmon['id']} {fridge['class_name']}_{fridge['id']}"]
+    return goals
+
+
+def get_cereal_bowl_livingroom_goal(sim):
+    graph = sim.get_graph()
+    salmon = [node for node in graph["nodes"] if node["class_name"] == "salmon"][0]
+    fridge = [node for node in graph["nodes"] if node["class_name"] == "fridge"][0]
+    goals = [f"INSIDE {salmon['class_name']}_{salmon['id']} {fridge['class_name']}_{fridge['id']}"]
+    return goals
+
 plate_goals = get_put_away_plates_goal(sim)
 planner.set_goal(plate_goals, plate_goals)
 print(planner.solve())

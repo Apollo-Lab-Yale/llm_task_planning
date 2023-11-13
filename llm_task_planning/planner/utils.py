@@ -30,8 +30,8 @@ def generate_next_action_prompt(actions, goal_actions, goal, robot_state, previo
     #     prompts+=item_states
     if previous_failure != "":
         prompts += ['\n'+previous_failure]
-    if len(previous_actions) > 0:
-        prompts += [f"I have completed the following actions: {previous_actions[-10:]}"]
+    # if len(previous_actions) > 0:
+    #     prompts += [f"I have completed the following actions: {previous_actions[-10:]}"]
 
     prompts += [f"Right now I can only perform the following actions: {actions}",
                 # f"This is how these objects relate to each other: {relevant_relations}",

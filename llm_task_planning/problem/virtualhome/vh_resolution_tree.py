@@ -41,7 +41,17 @@ def get_top_n(d, n):
         d.pop(top_list[-1])
     return top_list
 
-
+def get_world_predicate_set(graph):
+    predicates = set()
+    id_map = {}
+    for obj in graph["nodes"]:
+        id_map[obj["id"]] = obj['class_name']
+        for pred in obj["properties"]+obj["states"]:
+            predicates.add(f"{pred} {obj['class_name']}_{obj['id']}")
+    for edge in graph["edges"]:
+        relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
+        predicates.add(relation)
+    return predicates
 def resolve_nonvisible(goal, obj_preds, rooms):
     if goal in obj_preds["FAR"]:
         return [f"walk {goal}"]

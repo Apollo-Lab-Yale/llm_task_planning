@@ -2,16 +2,33 @@ from llm_task_planning.llm import openai_interface
 from llm_task_planning.sim import VirtualHomeSimEnv
 from llm_task_planning.sim.utils import translate_action_for_sim, get_relevant_relations
 from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
-from llm_task_planning.problem.virtualhome.vh_resolution_tree import get_all_valid_actions, resolve_nonvisible, resolve_not_holding, resolve_off, resolve_on, resolve_place_object, resolve_not_ontop, resolve_not_inside, get_object_properties_and_states, resolve_open, resolve_closed
+from llm_task_planning.problem.virtualhome.vh_resolution_tree import get_all_valid_actions, resolve_nonvisible, resolve_not_holding, resolve_off, resolve_on, resolve_place_object, resolve_not_ontop, resolve_not_inside, get_object_properties_and_states, resolve_open, resolve_closed, get_world_predicate_set
 from llm_task_planning.problem.utils import parse_instantiated_predicate, get_robot_state
 from llm_task_planning.planner.utils import extract_actions, generate_next_action_prompt, parse_response, generate_goal_prompt, generate_cooked_prompt, generate_next_action_prompt_combined, \
     generate_next_action_prompt_short
 from llm_task_planning.llm import query_model, setup_openai
 import numpy as np
 
+# todo: incorperate "clean x" and "cook y"
+## ordering of tasks requires understanding of the context
+## avoid object permanance and
+
+
+'''
+option 1:
+- ignore issues with object permanence, and memory, and complex tasks like cook + clean
+- get a base level paper 
+Option2: 
+ - try to push this to the limit
+ - include memory and object permanence
+ - give a week or two try to get THIS DONE 
+ - 
+ - 
+'''
+
 
 class PDDLPlanner:
-    def __init__(self, problem : VirtualHomeProblem, sim_env: VirtualHomeSimEnv, retain_memory=True):
+    def __init__(self, problem : VirtualHomeProblem, sim_env: VirtualHomeSimEnv, retain_memory=False):
         self.problem = problem
         self.sim = sim_env
         self.goal = set()
@@ -24,7 +41,7 @@ class PDDLPlanner:
         self.item_states = set()
         self.last_failure = ""
         self.max_llm_retry = 5
-        self.max_action_steps = 20
+        self.max_action_steps = 50
         self.failure_resolutions = []
         self.robot_location = ""
         self.start_state = None
@@ -37,16 +54,24 @@ class PDDLPlanner:
             self.robot_location = location
             goal = self.goal
             actions = set()
-            for sub_goal in goal:
-                sub_actions = self.get_feasible_actions(sub_goal, state)
-                if sub_actions is None:
-                    continue
-                actions = actions.union(set(sub_actions))
+            didScanRoom="scanroom" in self.actions_taken[-1] if len(self.actions_taken) > 0 else False
+            sub_goal = goal[0]
+            # for sub_goal in goal:
+            sub_actions = self.get_feasible_actions(sub_goal, state)
+            if sub_actions is None:
+                continue
+            if didScanRoom:
+                removed = 0
+                for i in range(len(sub_actions)):
+                    if "scanroom" in sub_actions[i - removed]:
+                        sub_actions.pop(i - removed)
+                        removed += 1
+            actions = actions.union(set(sub_actions))
             # all_actions, goal_actions = get_all_valid_actions(state, self.goal, current_room=location,
             #                                       didScanRoom="scanroom" in self.actions_taken[-1] if len(self.actions_taken) > 0 else False)
             rooms = [f"{room['class_name']}_{room['id']}" for room in state["rooms"]]
             relevant_relations = get_relevant_relations(state["object_relations"], rooms=rooms)
-            new_prompt = generate_next_action_prompt(actions, [], self.nl_goal, robot_state, self.last_failure, self.actions_taken, relevant_relations, [f"{self.item_states}"])
+            new_prompt = generate_next_action_prompt(actions, [], self.goal, robot_state, self.last_failure, self.actions_taken, relevant_relations, [f"{self.item_states}"])
             self.last_failure = ""
             print("#################################")
             print()
@@ -99,8 +124,9 @@ class PDDLPlanner:
                 print(msg)
                 self.last_failure = f"I failed to perform action: {action} due to blocking condition."
             state = self.sim.get_state()
-            self.actions_taken.append(f"{action}")
-            if self.check_satisfied(state["predicates"]):
+            if self.last_failure != "":
+                self.actions_taken.append(f"{action}")
+            if self.check_satisfied(get_world_predicate_set(self.sim.get_graph())):
                 print("Task success!")
                 return True
         print("Max actions taken, task failed.")
@@ -109,9 +135,12 @@ class PDDLPlanner:
 
     def check_satisfied(self, predicates):
         print(predicates)
-        for predicate in predicates:
-            if predicate in self.goal:
-                self.goal.remove(predicate)
+        to_remove = []
+        for sub_goal in self.goal:
+            if sub_goal in predicates:
+                to_remove.append(sub_goal)
+        for sub_goal in to_remove:
+            self.goal.remove(sub_goal)
         return len(self.goal) == 0
 
     def get_feasible_actions(self, goal, state):
