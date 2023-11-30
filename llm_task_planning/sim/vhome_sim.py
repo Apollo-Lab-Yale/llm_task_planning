@@ -3,17 +3,23 @@ from simulation.unity_simulator.comm_unity import UnityCommunication
 from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhome, get_object, get_object_by_category, build_state, format_state, UTILITY_SIM_PATH
 import sys
 import time
+import numpy as np
 
 
 class VirtualHomeSimEnv:
     def __init__(self, env_idm=1, host="127.0.0.1", port="8080", sim=None, no_graphics=False):
-        if sim is None and not no_graphics:
+        if sim is None:
             sim = start_sim()
         self.no_graphics = no_graphics
         self.character_added = False
         self.sim = sim
+        # if not no_graphics:
         self.comm = UnityCommunication(port=port, no_graphics=no_graphics)#, file_name=UTILITY_SIM_PATH)
+        # else:
+        #     self.comm = UnityCommunication(port=port, no_graphics=no_graphics, file_name=UTILITY_SIM_PATH)
+        self.object_waypoints = {}
         self.comm.reset(env_idm)
+        print(env_idm)
         self.env_id = env_idm
         self.add_character()
         self.camera_index = self.get_camera_index()
@@ -34,10 +40,12 @@ class VirtualHomeSimEnv:
         return -1
 
 
-    def add_character(self, model='Chars/Male1', room="bedroom"):
-        if not self.character_added:
-            self.comm.add_character_camera()
-
+    def add_character(self, model='Chars/Male1', room=None):
+        ROOMS = ["kitchen", "bedroom", "bathroom", "livingroom"]
+        # if not self.character_added:
+        #     self.comm.add_character_camera()
+        if room is None:
+            room = np.random.choice(ROOMS)
         self.comm.add_character(model, initial_room=room)
         self.character_added = True
 
@@ -56,6 +64,7 @@ class VirtualHomeSimEnv:
         return get_object(graph, object_class)
 
     def set_view(self, camera=None):
+        return
         if camera is None:
             camera = self.comm.camera_count()[1] - 1
         self.comm.camera_image([camera])
@@ -71,21 +80,30 @@ class VirtualHomeSimEnv:
         chars = [graph["nodes"][0]]
         rooms = [obj for obj in graph["nodes"] if obj["category"].lower()[:-1] == "room"]
         visible = self.comm.get_visible_objects(self.camera_index)[1]
-        visible_ids = set(visible)
-        visible = [node for node in graph["nodes"] if f"{node['id']}" in visible_ids or node["class_name"] == chars[0]["class_name"]]
-        edges = [edge for edge in graph["edges"] if f"{edge['from_id']}" in visible_ids or f"{edge['to_id']}" in visible_ids or chars[0]["id"] == edge['from_id'] or chars[0]["id"] == edge['to_id']]
-        state = chars + list(visible)
+        visible_ids = set([int(id) for id in visible])
+        add_ids = set()
+        for obj in self.object_waypoints:
+            class_name, obj_id = obj.split("_")
+            obj_id = int(obj_id)
+            waypoint_ids = [int(item.split("_")[1]) for item in self.object_waypoints[obj]]
+            if any(w_id in visible_ids for w_id in waypoint_ids):
+                visible_ids.add(obj_id)
+
+        visible = [node for node in graph["nodes"] if node['id'] in visible_ids or node["class_name"] == chars[0]["class_name"]]
+        edges = [edge for edge in graph["edges"] if edge['from_id'] in visible_ids or edge['to_id'] in visible_ids or chars[0]["id"] == edge['from_id']]
+        state = list(visible)
         formatted_state = format_state(state, edges, graph)
         formatted_state["rooms"] = rooms
         formatted_state["room_names"] = [f"{room['class_name']}_{room['id']}" for room in rooms]
         return formatted_state
 
-    def handle_scan_room(self, goal_object):
+    def handle_scan_room(self, goal_object, memory):
         for i in range(12):
-            self.comm.render_script(["<char0> [turnleft]"])
+            self.comm.render_script(["<char0> [turnleft]"], frame_rate=60)
             time.sleep(0.5)
             state = self.get_state()
-            if any([f"{object['name']}_{object['id']}" == goal_object for object in state["objects"]]):
+            memory.update_memory(state)
+            if any([f"{object['name']}_{object['id']}" == goal_object or f"{object['name']}_{object['id']}" in self.object_waypoints.get(goal_object, set()) for object in state["objects"]]):
                 return True
         return False
 
@@ -102,6 +120,60 @@ class VirtualHomeSimEnv:
                     cooked.append(edge["from_id"])
         return [node for node in state["nodes"] if node["id"] in cooked]
 
+    def add_item(self, class_name="spoon"):
+        print("in add item")
+        graph = self.get_graph()
+        new_node = {
+            'id': 1000,
+            'class_name': class_name,
+            'states': []
+        }
+        graph["nodes"].insert(0, new_node)
+        print("adding id")
+        self.comm.expand_scene(graph)
+        print("id added")
+        return [node for node in self.get_graph()["nodes"] if node["class_name"] == class_name][-1]
+
+
+    def add_object_waypoint(self, object, waypoint):
+        if object not in self.object_waypoints:
+            self.object_waypoints[object] = set()
+        self.object_waypoints[object].add(waypoint)
+
+    def create_waypoint(self, node, offset=(-0.017001, 1, -0.43), class_name="bellpepper", pose=None):
+        graph = self.get_graph()
+        new_node = {
+            'id': 1000,
+            'class_name': class_name,
+            'states': []
+        }
+        graph["nodes"].append(new_node)
+        print("adding id")
+        self.comm.fast_reset(self.env_id)
+        success, msg = self.comm.expand_scene(graph, randomize=True)
+        print(f"Expand graph :{success}, msg: {msg}")
+        graph = self.get_graph()
+        index = [i for i in range(len(graph["nodes"])) if graph["nodes"][i]["class_name"] == class_name]
+        index = index[-1]
+        new_pose = node["obj_transform"]["position"]
+        new_pose = (new_pose[0] + offset[0], new_pose[1] + offset[1], new_pose[2] + offset[2])
+        if pose is None:
+            pose = new_pose
+        graph["nodes"][index]["obj_transform"]["position"] = pose
+        self.comm.fast_reset(self.env_id)
+        success, msg = self.comm.expand_scene(graph)
+        print(f"Expand graph :{success}, msg: {msg}")
+        return graph["nodes"][index]
+
+    def put_node1_on_node2(self, node1, node2):
+        graph = self.get_graph()
+        new_edge = {
+            "from_id": node2["id"],
+            "to_id": node1["id"],
+            'relation_type': "ON"
+        }
+        graph["edges"].append(new_edge)
+        self.comm.expand_scene(graph)
 
     def set_up_cereal_env(self):
         self.comm.fast_reset(self.env_id)

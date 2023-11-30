@@ -63,3 +63,7 @@ $RECYCLE.BIN/
 .ipynb_checkpoints/
 
 */__pycache__/
+./llm_task_planning/planner/prog_prompt/progprompt_env/
+./data/
+./llm_task_planning/planner/prog_prompt/data/
+./llm_task_planning/planner/prog_prompt/

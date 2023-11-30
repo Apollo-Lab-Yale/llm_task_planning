@@ -1,20 +1,3 @@
-import time
-import numpy as np
-
-from llm_task_planning.planner.pddl_planner import PDDLPlanner
-from llm_task_planning.planner.utils import parse_response
-from llm_task_planning.sim.vhome_sim import VirtualHomeSimEnv
-from llm_task_planning.sim.utils import get_sim_object
-from llm_task_planning.planner.utils import extract_actions
-from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
-from pddl.logic import constants, Variable, variables
-
-problem = VirtualHomeProblem()
-sim = VirtualHomeSimEnv(0)
-# bowl = sim.set_up_cereal_env()
-# sim.comm.activate_physics()
-planner = PDDLPlanner(problem, sim)
-
 def get_put_away_plates_goal(sim):
     goal = 'plate'
     goal_start = "kitchentable"
@@ -37,12 +20,9 @@ def get_throw_away_pepper_goal(sim):
     kitchen_trash_ids = [edge["from_id"] for edge in graph["edges"] if
                         edge["from_id"] in trash_ids and edge["to_id"] == kitchen["id"]]
     trashcan_node = [tc for tc in all_trash if tc["id"] in kitchen_trash_ids][0]
-    new_node = sim.create_waypoint(trashcan_node)
-    sim.add_object_waypoint(f"{trashcan_node['class_name']}_{trashcan_node['id']}", f"{new_node['class_name']}_{new_node['id']}")
-
-    pepper = [node for node in graph["nodes"] if node["class_name"] == "bellpepper"][0]
+    pepper = [node for node in graph["nodes"] if node["class_name"] == "apple"][0]
     goals = [f"INSIDE {pepper['class_name']}_{pepper['id']} {trashcan_node['class_name']}_{trashcan_node['id']}"]
-    return goals, f"Throw away the apple."
+    return goals, f"Throw away the bell pepper."
 
 def get_wash_then_put_away_plates_goal(sim):
     goal = 'plate'
@@ -56,9 +36,6 @@ def get_wash_then_put_away_plates_goal(sim):
     kitchen = [node for node in state["nodes"] if node["class_name"]=="kitchen"][0]
     kitchen_sink_ids = [edge["from_id"] for edge in state["edges"] if edge["from_id"] in sink_ids and edge["to_id"] == kitchen["id"]]
     sink_node = [sink for sink in all_sinks if sink["id"] in kitchen_sink_ids][0]
-    new_node = sim.create_waypoint(sink_node)
-    sim.add_object_waypoint(f"{sink_node['class_name']}_{sink_node['id']}",
-                            f"{new_node['class_name']}_{new_node['id']}")
     table_node = [node for node in state["nodes"] if node["class_name"]=="kitchentable"][0]
     cabinet_node = [node for node in state["nodes"] if node["class_name"]=="kitchencabinet"][0]
     on_table = [edge["from_id"] for edge in state["edges"] if edge["relation_type"] == "ON" and edge["to_id"] == table_node["id"]]
@@ -72,10 +49,6 @@ def get_put_salmon_in_fridge_goal(sim):
     graph = sim.get_graph()
     salmon = [node for node in graph["nodes"] if node["class_name"] == "salmon"][0]
     fridge = [node for node in graph["nodes"] if node["class_name"] == "fridge"][0]
-    new_node = sim.create_waypoint(fridge)
-    sim.add_object_waypoint(f"{fridge['class_name']}_{fridge['id']}", f"{new_node['class_name']}_{new_node['id']}")
-    print("graph expanded")
-    print(fridge)
     goals = [f"INSIDE {salmon['class_name']}_{salmon['id']} {fridge['class_name']}_{fridge['id']}"]
     return goals, f"put the {salmon['class_name']}_{salmon['id']} in the {fridge['class_name']}_{fridge['id']}."
 
@@ -96,23 +69,8 @@ def get_make_toast_goal(sim):
 def get_cook_salmon_in_microwave_put_on_table_goal(sim):
     graph = sim.get_graph()
     table_node = [node for node in graph["nodes"] if node["class_name"] == "kitchentable"][0]
-    new_node = sim.create_waypoint(table_node, offset=(0,1.3,0))
-    sim.add_object_waypoint(f"{table_node['class_name']}_{table_node['id']}", f"{new_node['class_name']}_{new_node['id']}")
     salmon = [node for node in graph["nodes"] if node["class_name"] == "salmon"][0]
     microwave = [node for node in graph["nodes"] if node["class_name"] == "microwave"][0]
     goals = [f"COOKED {salmon['class_name']}_{salmon['id']} {microwave['class_name']}_{microwave['id']}", f"ON {salmon['class_name']}_{salmon['id']} {table_node['class_name']}_{table_node['id']}"]
     return goals, f"Cook the {salmon['class_name']}_{salmon['id']} in the {microwave['class_name']}_{microwave['id']}, then put it on the {table_node['class_name']}_{table_node['id']}."
 
-def get_cereal_bowl_livingroom_goal(sim):
-    graph = sim.get_graph()
-    salmon = [node for node in graph["nodes"] if node["class_name"] == "salmon"][0]
-    fridge = [node for node in graph["nodes"] if node["class_name"] == "fridge"][0]
-    goals = [f"INSIDE {salmon['class_name']}_{salmon['id']} {fridge['class_name']}_{fridge['id']}"]
-    return goals
-
-
-parsed_goals, nl_goals = get_cook_salmon_in_microwave_put_on_table_goal(sim)
-
-print(parsed_goals)
-planner.set_goal(parsed_goals, nl_goals)
-print(planner.solve())
