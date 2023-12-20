@@ -1,0 +1,9 @@
+[submodule "llm_task_planning/planner/FastDownward"]
+	path = llm_task_planning/planner/FastDownward
+	url = https://github.com/caelan/FastDownward.git
+[submodule "llm_task_planning/planner/downward"]
+	path = llm_task_planning/planner/downward
+	url = https://github.com/aibasel/downward.git
+[submodule "llm_task_planning/planner/task-planning"]
+	path = llm_task_planning/planner/contingent_ff/
+	url = https://github.com/dgerod/task-planning.git

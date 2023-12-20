@@ -18,7 +18,7 @@ class VirtualHomeSimEnv:
         # else:
         #     self.comm = UnityCommunication(port=port, no_graphics=no_graphics, file_name=UTILITY_SIM_PATH)
         self.object_waypoints = {}
-        self.comm.reset(env_idm)
+        self.comm.fast_reset(env_idm)
         print(env_idm)
         self.env_id = env_idm
         self.add_character()
@@ -39,6 +39,15 @@ class VirtualHomeSimEnv:
                 return camera["index"]
         return -1
 
+    def get_item_state_full(self, item_name = "salmon"):
+        graph = self.get_graph()
+        salmon = [obj for obj in graph["nodes"] if obj['class_name']==item_name][0]
+        salmon_id = salmon['id']
+        relations = [relation for relation in graph["edges"] if salmon_id in relation.values()]
+        print("*****************")
+        print(salmon)
+        print(relations)
+        print("*****************")
 
     def add_character(self, model='Chars/Male1', room=None):
         ROOMS = ["kitchen", "bedroom", "bathroom", "livingroom"]
@@ -74,7 +83,7 @@ class VirtualHomeSimEnv:
             graph = self.get_graph()
         return get_object_by_category(graph, "Room")
 
-    def get_state(self, graph=None):
+    def get_state(self, graph=None, goal_objs=()):
         if graph is None:
             graph = self.get_graph()
         chars = [graph["nodes"][0]]
@@ -82,6 +91,21 @@ class VirtualHomeSimEnv:
         visible = self.comm.get_visible_objects(self.camera_index)[1]
         visible_ids = set([int(id) for id in visible])
         add_ids = set()
+        room_ids = [node["id"] for node in graph["nodes"] if node["category"]=="Rooms"]
+        for goal in goal_objs:
+            goal_edges = []
+            name, id = goal.split("_")
+            id = int(id)
+            for edge in graph["edges"]:
+                relation = edge["relation_type"]
+                if id in edge.values() and ((relation == "INSIDE" and edge["to_id"] not in room_ids) or (relation == "CLOSE" and 1 in edge.values())):
+                    goal_edges.append(edge)
+                if any(edge["relation_type"] == "INSIDE" for edge in goal_edges) and any(edge["relation_type"] == "CLOSE" for edge in goal_edges):
+                    container_id = [edge["to_id"] for edge in goal_edges if edge["relation_type"] == "INSIDE"][0]
+                    container = [node for node in graph["nodes"] if node["id"] == container_id][0]
+                    if "OPEN" in container["states"]:
+                        visible_ids.add(int(id))
+                        break
         for obj in self.object_waypoints:
             class_name, obj_id = obj.split("_")
             obj_id = int(obj_id)

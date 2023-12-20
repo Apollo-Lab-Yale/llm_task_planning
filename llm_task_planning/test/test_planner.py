@@ -12,7 +12,6 @@ from pddl.logic import constants, Variable, variables
 problem = VirtualHomeProblem()
 sim = VirtualHomeSimEnv(0)
 # bowl = sim.set_up_cereal_env()
-# sim.comm.activate_physics()
 planner = PDDLPlanner(problem, sim)
 
 def get_put_away_plates_goal(sim):
@@ -111,8 +110,10 @@ def get_cereal_bowl_livingroom_goal(sim):
     return goals
 
 
-parsed_goals, nl_goals = get_cook_salmon_in_microwave_put_on_table_goal(sim)
+parsed_goals, nl_goals = get_put_away_plates_goal(sim)
+print(parsed_goals, nl_goals)
+sim.comm.activate_physics(gravity=0)
 
 print(parsed_goals)
 planner.set_goal(parsed_goals, nl_goals)
-print(planner.solve())
+print(planner.solve(None))

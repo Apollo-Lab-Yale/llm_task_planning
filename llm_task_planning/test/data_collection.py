@@ -5,14 +5,17 @@ import csv
 import numpy as np
 from copy import deepcopy
 
+
 from llm_task_planning.sim.vhome_sim import VirtualHomeSimEnv
 from llm_task_planning.planner.pddl_planner import PDDLPlanner
+from llm_task_planning.planner.prog_prompt.progprompt_planner import ProgPromptPlanner
 # from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
 
 from goal_gen import get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal
 
-goal_methods = [get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
+# goal_methods = [get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
 
+goal_methods = [get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
 
 
 def record_data(success, planner : PDDLPlanner, path, run, goals):
@@ -29,18 +32,22 @@ def record_data(success, planner : PDDLPlanner, path, run, goals):
     print(planner.all_failures)
     print(planner.all_llm_responses)
     print(planner.all_prompts)
+    print(len(planner.actions_taken), len(planner.all_prompts), len(planner.all_llm_responses), len(planner.all_failures))
+
     np.savez(os.path.join(path, f"run_{run}_data"), actions=planner.actions_taken, prompts=planner.all_prompts, responses=planner.all_llm_responses, failures=planner.all_failures)
 
-def run_goals(num_runs, goal_fns, planner : PDDLPlanner, directory, current_datetime):
+def run_goals(num_runs, goal_fns, planner : PDDLPlanner, directory, current_datetime, args):
     num_problems = 0
     for fn in goal_fns:
         num_problems += 1
         for i in range(num_runs):
+            print("reseting")
             planner.sim.comm.reset(0)
+            print("reset")
             goals, nl_goals = fn(planner.sim)
             planner.sim.add_character()
             planner.set_goal(deepcopy(goals), deepcopy(nl_goals))
-            success, sim_error = planner.solve()
+            success, sim_error = planner.solve(args)
             if sim_error < 0:
                 i -= 1
                 continue
@@ -49,18 +56,46 @@ def run_goals(num_runs, goal_fns, planner : PDDLPlanner, directory, current_date
 
 
 def main():
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem", type=str, choices=["all", ""], default="all")
-    parser.add_argument("--num-runs", type=int, default=2)
+    parser.add_argument("--planner", type=str, choices=["PDDLPlanner", "ProgPrompt", ""], default="PDDLPlanner")
+    parser.add_argument("--num-runs", type=int, default=10)
     parser.add_argument("--data-path", type=str, default="/home/liam/dev/llm_task_planning/data/data_collection/")
     parser.add_argument("--show-graphics", type=bool, default=False)
-    args = parser.parse_args()
+    parser.add_argument("--progprompt-path", type=str,
+                        default="/home/liam/dev/llm_task_planning/llm_task_planning/planner/prog_prompt")
+    parser.add_argument("--expt-name", type=str, default=datetime.now().strftime("%Y%m%d_%H%M%S"))
 
-    sim = VirtualHomeSimEnv(0, no_graphics=not args.show_graphics)
+    parser.add_argument("--gpt-version", type=str, default="gpt-3.5-turbo-1106",
+                        choices=['text-davinci-002', 'davinci', 'code-davinci-002', "gpt-3.5-turbo-1106"])
+    parser.add_argument("--env-id", type=int, default=0)
+    parser.add_argument("--test-set", type=str, default="test_unseen",
+                        choices=['test_unseen', 'test_seen', 'test_unseen_ambiguous', 'env1', 'env2'])
+
+    parser.add_argument("--prompt-task-examples", type=str, default="default",
+                        choices=['default', 'random'])
+    # for random task examples, choose seed
+    parser.add_argument("--seed", type=int, default=0)
+
+    ## NOTE: davinci or older GPT3 versions have a lower token length limit
+    ## check token length limit for models to set prompt size:
+    ## https://platform.openai.com/docs/models
+    parser.add_argument("--prompt-num-examples", type=int, default=3,
+                        choices=range(1, 7))
+    parser.add_argument("--prompt-task-examples-ablation", type=str, default="none",
+                        choices=['none', 'no_comments', "no_feedback", "no_comments_feedback"])
+    args = parser.parse_args()
+    print("starting sim")
+    sim = VirtualHomeSimEnv(0, no_graphics=not args.show_graphics, port="8080")
+    print("sim started")
+
     # problem = VirtualHomeProblem()
     problem = None
-    planner = PDDLPlanner(problem, sim)
+    planner = None
+    if args.planner == "PDDLPlanner":
+        planner = PDDLPlanner(problem, sim)
+    if args.planner == "ProgPrompt":
+        planner = ProgPromptPlanner(sim)
     # Create a new directory with the current datetime
     current_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
     directory_name = f"{args.data_path}/data_collection_{current_datetime}"
@@ -73,7 +108,7 @@ def main():
     if args.problem == "all":
         goals = goal_methods
 
-    run_goals(args.num_runs, goals, planner, directory_name, current_datetime)
+    run_goals(args.num_runs, goals, planner, directory_name, current_datetime, args)
 
 
 if __name__ == "__main__":

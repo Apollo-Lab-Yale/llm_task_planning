@@ -71,7 +71,8 @@ class PDDLPlanner:
 
     def get_next_action(self):
         for _ in range(self.max_llm_retry):
-            state = self.sim.get_state()
+            _, goal_objects = parse_instantiated_predicate(self.goal[0])
+            state = self.sim.get_state(goal_objs=goal_objects)
             self.memory.update_memory(state)
             self.memory.object_waypoints = self.sim.object_waypoints
             robot_state, location = get_robot_state(state)
@@ -141,7 +142,7 @@ class PDDLPlanner:
             return selected_action, state
 
     # todo - add failure detection
-    def solve(self):
+    def solve(self, args):
         self.start_state = self.sim.get_graph()
         for _ in range(self.max_action_steps):
             abstract_planning_start = time.time()
@@ -165,6 +166,9 @@ class PDDLPlanner:
             print(f"Executing script: {sim_action_list}")
             sim_planning_start = time.time()
             success, msg = self.sim.comm.render_script(sim_action_list, frame_rate=60)
+            if success and "put" in action:
+                _, objs = parse_instantiated_predicate(action)
+                self.sim.add_object_waypoint(objs[0], objs[1])
             self.sim_planning_time += time.time() - sim_planning_start
             self.actions_taken.append(f"{action}")
             if not success:
@@ -180,7 +184,6 @@ class PDDLPlanner:
 
 
     def check_satisfied(self, predicates):
-        print(predicates)
         to_remove = []
         sub_goal = self.goal[0]
         if sub_goal in predicates:
