@@ -534,7 +534,7 @@
   (:init
     ; Initial locations
     (inside character_1 bedroom_73)
-    (inside salmon_327 SALMON_LOCATION)
+    (inside salmon_327 kitchen_205)
     (inside fridge_305 kitchen_205)
 
     (closed fridge_305)

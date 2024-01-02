@@ -203,6 +203,8 @@ def get_sim_object(name, nodes, location=None):
 
 def translate_action_for_sim(action : str, state):
     action = action.replace("?", "").split(" ")
+    if action[0] == "open":
+        action = action[:-1]
     if "look" in action[0]:
         action[0] = action[0].replace('look', 'turn')
     sim_action = f"<char0> [{action[0]}]"
