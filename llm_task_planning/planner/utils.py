@@ -32,8 +32,8 @@ def generate_next_action_prompt(actions, goal_memory, goal, robot_state, previou
         prompts += [f"The last known predicates of the current goal were: {goal_memory}"]
     if previous_failure != "":
         prompts += [previous_failure]
-    # if len(previous_actions) > 0:
-    #     prompts += [f"I have completed the following actions: {previous_actions[-10:]}"]
+    if len(previous_actions) > 0:
+        prompts += [f"I have completed the following actions: {previous_actions[-3:]}"]
 
     prompts += [f"Right now I can only perform the following actions: {actions}",
                 # f"This is how these objects relate to each other: {relevant_relations}",
@@ -42,6 +42,7 @@ def generate_next_action_prompt(actions, goal_memory, goal, robot_state, previou
                f"Of these actions which should I take to move towards my goal of {goal}. include an explaination for your action selection. Please refrain from getting stuck in action loops and provide your selected action in the format 'format '$$ <selected action> $$."]
     if len(goal_memory) > 0:
         prompts += [f"The last known predicates of the current goal were: {goal_memory}"]
+    prompts = [" ".join(prompt for prompt in prompts)]
     return prompts
 
 def generate_next_action_prompt_short(actions, goal_actions, goal, robot_state, previous_failure="", previous_actions = [], relevant_relations=(), item_states=[]):

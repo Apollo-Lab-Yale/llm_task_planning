@@ -103,7 +103,7 @@ class VirtualHomeSimEnv:
                 if any(edge["relation_type"] == "INSIDE" for edge in goal_edges) and any(edge["relation_type"] == "CLOSE" for edge in goal_edges):
                     container_id = [edge["to_id"] for edge in goal_edges if edge["relation_type"] == "INSIDE"][0]
                     container = [node for node in graph["nodes"] if node["id"] == container_id][0]
-                    if "OPEN" in container["states"]:
+                    if "OPEN" in container["states"] and "CLOSED" not in container["states"]:
                         visible_ids.add(int(id))
                         break
         for obj in self.object_waypoints:

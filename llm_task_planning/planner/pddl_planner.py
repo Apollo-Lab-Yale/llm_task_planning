@@ -81,6 +81,7 @@ class PDDLPlanner:
             goal = self.goal
             actions = set()
             sub_goal = goal[0]
+            print([pred for pred in state["predicates"] if any(goal_obj in pred for goal_obj in goal_objects)])
             # for sub_goal in goal:
             sub_actions = self.get_feasible_actions(sub_goal, state, self.memory)
             if sub_actions is None:

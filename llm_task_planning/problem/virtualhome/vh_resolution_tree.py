@@ -103,7 +103,9 @@ def resolve_place_object(obj_preds, rooms):
         actions += ["turnleft character", "turnright character"]
     return actions
 
+
 MAX_OBJ_HOLD = 2
+
 
 def resolve_not_holding(goal, obj_preds, rooms, memory = None):
     actions = []

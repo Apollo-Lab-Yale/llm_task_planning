@@ -12,7 +12,7 @@ class VirtualHomeSimEnv:
         self.character_added = False
         self.sim = sim
         self.comm = UnityCommunication(url=host, port=port, no_graphics=no_graphics, file_name=UTILITY_SIM_PATH)
-        self.comm.reset(env_idm)
+        self.comm.fast_reset(env_idm)
         self.add_character()
         self.camera_index = self.get_camera_index()
         self.set_view(self.camera_index)

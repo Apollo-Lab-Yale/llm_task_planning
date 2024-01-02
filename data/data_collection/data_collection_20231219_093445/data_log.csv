@@ -1,0 +1,11 @@
+Status,Planner,Num Actions,Abstract Planning Time,Sim Time,Run,Goals,Unsolved Goals
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,7,2.0642290115356445,31.534811973571777,0,get_cook_salmon_in_microwave_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,6,4.239671945571899,30.922581434249878,1,get_cook_salmon_in_microwave_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,7,4.369131803512573,31.625603199005127,2,get_cook_salmon_in_microwave_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,8,8.650377988815308,39.162681579589844,3,get_cook_salmon_in_microwave_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,7,5.704850912094116,30.656728744506836,4,get_cook_salmon_in_microwave_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,12,29.06612277030945,53.87246584892273,6,get_cook_salmon_in_microwave_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,8,6.949058771133423,34.76431202888489,7,get_cook_salmon_in_microwave_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,8,7.773810148239136,39.20828032493591,8,get_cook_salmon_in_microwave_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,8,8.387205362319946,32.40903401374817,9,get_cook_salmon_in_microwave_goal,
+False,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,54,169.12373113632202,195.01057958602905,0,get_cook_salmon_in_microwave_put_on_table_goal,ON salmon_327 kitchentable_231

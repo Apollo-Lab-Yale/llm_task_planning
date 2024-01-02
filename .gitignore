@@ -66,8 +66,9 @@ $RECYCLE.BIN/
 ./llm_task_planning/planner/prog_prompt/progprompt_env/
 ./data/
 ./llm_task_planning/planner/prog_prompt/data/
-./llm_task_planning/planner/prog_prompt/data/virtualhome/
-./llm_task_planning/planner/downward/
-./llm_task_planning/planner/llm_planner/
-./llm_task_planning/planner/zero_shot_planner/
-./llm_task_planning/planner/contingent_ff/
+./llm_task_planning/planner/prog_prompt/data/virtualhome/*
+./llm_task_planning/planner/downward/*
+./llm_task_planning/planner/llm_planner/*
+./llm_task_planning/planner/zero_shot_planner/*
+./llm_task_planning/planner/contingent_ff/*
+./data/*
