@@ -48,6 +48,8 @@ def get_put_salmon_in_fridge_goal(sim, fn_prototype=False):
     graph = sim.get_graph()
     salmon = [node for node in graph["nodes"] if node["class_name"] == "salmon"][0]
     fridge = [node for node in graph["nodes"] if node["class_name"] == "fridge"][0]
+    new_node = sim.create_waypoint(fridge)
+    sim.add_object_waypoint(f"{fridge['class_name']}_{fridge['id']}", f"{new_node['class_name']}_{new_node['id']}")
     goals = [f"INSIDE {salmon['class_name']}_{salmon['id']} {fridge['class_name']}_{fridge['id']}"]
     return goals, f"put the {salmon['class_name']}_{salmon['id']} in the {fridge['class_name']}_{fridge['id']}."
 

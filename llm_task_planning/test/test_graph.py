@@ -31,3 +31,4 @@ for object in objects:
     print(object)
 print('\n\n')
 print(predicates)
+
