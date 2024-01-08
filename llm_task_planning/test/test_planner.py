@@ -55,6 +55,7 @@ def get_wash_then_put_away_plates_goal(sim):
     kitchen = [node for node in state["nodes"] if node["class_name"]=="kitchen"][0]
     kitchen_sink_ids = [edge["from_id"] for edge in state["edges"] if edge["from_id"] in sink_ids and edge["to_id"] == kitchen["id"]]
     sink_node = [sink for sink in all_sinks if sink["id"] in kitchen_sink_ids][0]
+    print(sink_node)
     new_node = sim.create_waypoint(sink_node)
     sim.add_object_waypoint(f"{sink_node['class_name']}_{sink_node['id']}",
                             f"{new_node['class_name']}_{new_node['id']}")
@@ -109,11 +110,34 @@ def get_cereal_bowl_livingroom_goal(sim):
     goals = [f"INSIDE {salmon['class_name']}_{salmon['id']} {fridge['class_name']}_{fridge['id']}"]
     return goals
 
+def get_cook_salmon_put_away_plates_goal(sim):
+    graph = sim.get_graph()
+    state = graph
+    table_node = [node for node in graph["nodes"] if node["class_name"] == "kitchentable"][0]
+    new_node = sim.create_waypoint(table_node, offset=(0, 1.3, 0))
+    sim.add_object_waypoint(f"{table_node['class_name']}_{table_node['id']}",
+                            f"{new_node['class_name']}_{new_node['id']}")
+    salmon = [node for node in graph["nodes"] if node["class_name"] == "salmon"][0]
+    microwave = [node for node in graph["nodes"] if node["class_name"] == "microwave"][0]
+    goals = [f"COOKED {salmon['class_name']}_{salmon['id']} {microwave['class_name']}_{microwave['id']}",
+             f"ON {salmon['class_name']}_{salmon['id']} {table_node['class_name']}_{table_node['id']}"]
+    table_node = [node for node in state["nodes"] if node["class_name"] == "kitchentable"][0]
+    cabinet_node = [node for node in state["nodes"] if node["class_name"] == "kitchencabinet"][0]
+    on_table = [edge["from_id"] for edge in state["edges"] if
+                edge["relation_type"] == "ON" and edge["to_id"] == table_node["id"]]
+    plates = [node for node in state["nodes"] if node["id"] in on_table and node["class_name"] == "plate"]
+    goals += [f"INSIDE {plate['class_name']}_{plate['id']} {cabinet_node['class_name']}_{cabinet_node['id']}" for plate
+             in plates]
+    plates_str = f", ".join([f"{plate['class_name']}_{plate['id']}" for plate in plates[:-1]])
+    return (goals,
+            f"Cook the {salmon['class_name']}_{salmon['id']} in the {microwave['class_name']}_{microwave['id']}, then put it on the {table_node['class_name']}_{table_node['id']}."
+            + f"Put these plates: {plates_str}, and {plates[-1]['class_name']}_{plates[-1]['id']} into the {cabinet_node['class_name']}_{cabinet_node['id']}")
 
-parsed_goals, nl_goals = get_cook_salmon_in_microwave_put_on_table_goal(sim)
+parsed_goals, nl_goals = get_cook_salmon_put_away_plates_goal(sim)
 print(parsed_goals, nl_goals)
 # sim.comm.activate_physics(gravity=0)
 
 print(parsed_goals)
 planner.set_goal(parsed_goals, nl_goals)
+planner.sim.comm.activate_physics()
 print(planner.solve(None))

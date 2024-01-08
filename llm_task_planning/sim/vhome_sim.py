@@ -131,6 +131,37 @@ class VirtualHomeSimEnv:
                 return True
         return False
 
+    def translate_action_for_sim(self, action: str, state):
+        action = action.replace("?", "").split(" ")
+        if action[0] == "open":
+            action = action[:3]
+        if "look" in action[0]:
+            action[0] = action[0].replace('look', 'turn')
+        sim_action = f"<char0> [{action[0]}]"
+        for param in action[1:]:
+            if "character" in param:
+                continue
+            split_param = param.split("_")
+            obj_class, id = None, None
+            if len(split_param) <= 1:
+                matches = [object for object in state["objects"] if object["name"] == split_param[0]]
+                obj_class, id = matches[0]["name"], matches[0]["id"]
+            else:
+                obj_class, id = split_param
+            object_match = [object for object in state["objects"] if
+                            object["name"] == obj_class and object["id"] == int(id)]
+            goal = {"name": obj_class, "id": id}
+            if goal is None:
+                room_match = [room for room in state["rooms"] if room["class_name"] == obj_class]
+                goal = room_match[0]
+                goal["name"] = goal["class_name"]
+            sim_action += f" <{goal['name'].split('_')[0]}> ({goal['id']})"
+        action_list = [sim_action]
+        if "turn" in sim_action:
+            action_list *= 2
+
+        return action_list
+
     def check_cooked(self):
         state = self.get_graph()
         microwave = [node for node in state["nodes"] if node["class_name"] == "microwave"][0]

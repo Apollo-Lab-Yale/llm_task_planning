@@ -14,9 +14,9 @@ problem_files = ["salmon_cooked_microwave.pddl", "salmon_to_fridge.pddl", "plate
 
 sim = VirtualHomeSimEnv(0)
 graph = sim.get_graph()
-goals, nl_goal = get_cook_salmon_in_microwave_goal(sim)
+goals, nl_goal = get_cook_salmon_in_microwave_put_on_table_goal(sim)
 options = [f"{node['class_name']}_{node['id']}" for node in graph["nodes"] if "Room" in node["category"]]
 planner = ContingentFF(sim, options)
-planner.set_goal("salmon_cooked_microwave.pddl", options, goals, nl_goal)
+planner.set_goal("salmon_cooked_microwave_on_table.pddl", options, goals, nl_goal)
 planner.solve()
 print(len(planner.actions_taken))

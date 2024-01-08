@@ -1,5 +1,6 @@
 from llm_task_planning.llm import openai_interface
 from llm_task_planning.sim import VirtualHomeSimEnv
+from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 from llm_task_planning.sim.utils import translate_action_for_sim, get_relevant_relations
 from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
 from llm_task_planning.problem.virtualhome.vh_resolution_tree import get_all_valid_actions, resolve_nonvisible, resolve_not_holding, resolve_off, resolve_on, resolve_place_object, resolve_not_ontop, resolve_not_inside, get_object_properties_and_states, resolve_open, resolve_closed, get_world_predicate_set, resolve_cooked, \
@@ -31,7 +32,7 @@ Option2:
 
 
 class PDDLPlanner:
-    def __init__(self, problem : VirtualHomeProblem, sim_env: VirtualHomeSimEnv, retain_memory=False):
+    def __init__(self, problem : VirtualHomeProblem, sim_env, retain_memory=False):
         self.problem = problem
         self.sim = sim_env
         self.goal = set()
@@ -144,7 +145,6 @@ class PDDLPlanner:
 
     # todo - add failure detection
     def solve(self, args):
-        self.start_state = self.sim.get_graph()
         for _ in range(self.max_action_steps):
             abstract_planning_start = time.time()
             ret = self.get_next_action()
@@ -163,7 +163,7 @@ class PDDLPlanner:
                     self.last_failure = f"The action {action} failed. The object is not visible from my current location, do not repeat this action until moving locations."
                 self.actions_taken.append(action)
                 continue
-            sim_action_list = translate_action_for_sim(action, state)
+            sim_action_list = self.sim.translate_action_for_sim(action, state)
             print(f"Executing script: {sim_action_list}")
             sim_planning_start = time.time()
             success, msg = self.sim.comm.render_script(sim_action_list, frame_rate=60)

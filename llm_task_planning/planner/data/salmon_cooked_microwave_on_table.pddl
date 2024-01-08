@@ -20,9 +20,10 @@
     (standing character_1)
     (closed microwave_313)
     (off microwave_313)
+    (inside kitchentable_231 kitchen_205)
   )
   (:goal (and
     (cooked salmon_327 microwave_313)
-    (on salmon_327 kitchentable_231)
+    ;(on salmon_327 kitchentable_231)
   ))
 )

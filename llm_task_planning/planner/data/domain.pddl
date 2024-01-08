@@ -47,6 +47,7 @@
     (hands_full ?character)
     (can_cook ?cont)
     (cooked ?obj ?cont)
+    (in_room ?character ?room)
   )
 
   ; Actions
@@ -54,7 +55,7 @@
         :parameters (?character - Character ?obj1 - Object)
         :precondition (and (standing ?character) (visible ?obj1))
         :effect (and (close ?character ?obj1)
-                    ;(forall (?obj - object) (when (visible ?obj) (not (visible ?obj))))
+                    (forall (?obj - object) (when (not(close ?obj1 ?obj)) (not (visible ?obj))))
                     (visible ?obj1))
              )
 
@@ -62,18 +63,21 @@
         :parameters (?character - Character ?room - Room)
         :precondition (standing ?character)
         :effect (and
+                    (forall (?r - Room)
+                        (when (inside ?character ?r) (not(inside ?character ?r))))
                    (inside ?character ?room)
-                   (close ?character ?room)))
+                   (close ?character ?room)
+                   (forall (?obj - Object)
+                            (when (not(inside ?obj ?room)) (not (visible ?obj))))
+                 )
+                )
 
     (:action grab
         :parameters (?character - Character ?object - Object)
         :precondition (and (grabbable ?object) (close ?character ?object) (visible ?object) (not (hands_full ?character)))
         :effect (and (holds_rh ?character ?object)
                       (hands_full ?character)
-                      (forall (?cont - Object)
-
-                            (and (not (inside ?object ?cont)) (not (on ?object ?cont)))
-                     )
+                      (forall (?cont - Object)(when (inside ?object ?cont) (not (inside ?object ?cont))))
                 )
         )
 
@@ -88,7 +92,7 @@
         :effect (off ?object))
 
     (:action put
-        :parameters (?character - Character ?object - Object ?target - Surface)
+        :parameters (?character - Character ?object - Object ?target - Object)
         :precondition (and (holds_rh ?character ?object) (close ?character ?target))
         :effect (and (not (holds_rh ?character ?object)) (on ?object ?target) (not (hands_full ?character))) )
 
@@ -103,6 +107,7 @@
         :parameters (?character - Character ?obj - Object ?room - Room)
         :precondition (and (inside ?character ?room))
         :effect (and
+
             (when (inside ?obj ?room) (visible ?obj))
         )
     )
@@ -114,6 +119,7 @@
         :precondition (and (close ?character ?container)
                         (closed ?container)
                         (visible ?container)
+                        (not(active ?container))
                        )
         :effect (and (open ?container)
                     (forall (?obj - Object)

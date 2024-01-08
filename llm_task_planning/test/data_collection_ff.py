@@ -11,9 +11,8 @@ from llm_task_planning.planner.contingent_ff.contingent_ff import ContingentFF
 
 from goal_gen import get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal
 
-# goal_methods = [get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
-goal_methods = [get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
-
+goal_methods = [get_make_toast_goal, get_put_salmon_in_fridge_goal]
+goal_problems = ["toast_cooked_toaster.pddl", "salmon_to_fridge.pddl"]
 
 def record_data(success, planner : ContingentFF, path, run, goals):
     csv_file_path = os.path.join(path, "data_log.csv")
@@ -24,17 +23,19 @@ def record_data(success, planner : ContingentFF, path, run, goals):
             # Write header if the file does not exist
             writer.writerow(["Status", "Planner", "Num Actions", "Abstract Planning Time", "Sim Time", "Run", "Goals", "Unsolved Goals"])
         writer.writerow([success, type(planner), len(planner.actions_taken), planner.abstract_planning_time, planner.sim_planning_time, run, goals, "&".join(list(planner.goal))])
-    print(len(planner.actions_taken), len(planner.all_prompts), len(planner.all_llm_responses), len(planner.all_failures))
+    print(len(planner.actions_taken), len(planner.all_sub_plans), len(planner.all_failures))
     print(planner.actions_taken)
     print(planner.all_failures)
     print(planner.all_sub_plans)
-    print(len(planner.actions_taken), len(planner.all_prompts), len(planner.all_sub_plans), len(planner.all_failures))
+    print(len(planner.actions_taken), len(planner.all_sub_plans), len(planner.all_failures))
 
-    np.savez(os.path.join(path, f"run_{run}_data"), actions=planner.actions_taken, prompts=planner.all_prompts, failures=planner.all_failures)
+    np.savez(os.path.join(path, f"run_{run}_data"), actions=planner.actions_taken, sub_plans=planner.all_sub_plans, failures=planner.all_failures)
 
 def run_goals(num_runs, goal_fns, planner : ContingentFF, directory, current_datetime, args):
     num_problems = 0
-    for fn in goal_fns:
+    for i in range(len(goal_fns)):
+        fn = goal_fns[i]
+        problem = goal_problems[i]
         num_problems += 1
         for i in range(num_runs):
             print("reseting")
@@ -42,7 +43,7 @@ def run_goals(num_runs, goal_fns, planner : ContingentFF, directory, current_dat
             print("reset")
             goals, nl_goals = fn(planner.sim)
             planner.sim.add_character()
-            planner.set_goal(deepcopy(goals), deepcopy(nl_goals))
+            planner.set_goal(problem, get_tmp_options(problem, planner.sim), goals, deepcopy(nl_goals))
             success, sim_error = planner.solve()
             if sim_error < 0:
                 i -= 1

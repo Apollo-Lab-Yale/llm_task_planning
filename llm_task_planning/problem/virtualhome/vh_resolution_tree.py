@@ -42,7 +42,7 @@ def get_top_n(d, n):
         d.pop(top_list[-1])
     return top_list
 
-def get_world_predicate_set(graph):
+def get_world_predicate_set(graph, custom_preds=()):
     predicates = set()
     id_map = {}
     for obj in graph["nodes"]:
@@ -52,6 +52,8 @@ def get_world_predicate_set(graph):
     for edge in graph["edges"]:
         relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
         predicates.add(relation)
+    for pred in custom_preds:
+        predicates.add(pred)
     return predicates
 
 
@@ -102,10 +104,6 @@ def resolve_place_object(obj_preds, rooms):
     if len(actions) == 0:
         actions += ["turnleft character", "turnright character"]
     return actions
-
-
-MAX_OBJ_HOLD = 2
-
 
 def resolve_not_holding(goal, obj_preds, rooms, memory = None):
     actions = []
@@ -184,7 +182,7 @@ def resolve_cooked(obj1, obj2, obj_preds, rooms, memory = None):
 def resolve_wash_obj1_in_obj2(obj1, obj2, obj_preds, rooms, memory = None):
     print("resolve wash")
     if (obj1, obj2) not in obj_preds["IN"]:
-        return resolve_not_ontop(obj1, obj2, obj_preds, rooms, memory)
+        return resolve_not_inside(obj1, obj2, obj_preds, rooms, memory)
     if obj2 not in obj_preds["CAN_OPEN"].intersection(obj_preds["CLOSED"]):
         return [f"close {obj2}"]
     if obj2 not in obj_preds.get("ON", set()):
