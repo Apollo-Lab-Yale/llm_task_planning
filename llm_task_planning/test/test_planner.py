@@ -3,16 +3,11 @@ import numpy as np
 
 from llm_task_planning.planner.pddl_planner import PDDLPlanner
 from llm_task_planning.planner.utils import parse_response
-from llm_task_planning.sim.vhome_sim import VirtualHomeSimEnv
+from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 from llm_task_planning.sim.utils import get_sim_object
 from llm_task_planning.planner.utils import extract_actions
 from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
 from pddl.logic import constants, Variable, variables
-
-problem = VirtualHomeProblem()
-sim = VirtualHomeSimEnv(0)
-# bowl = sim.set_up_cereal_env()
-planner = PDDLPlanner(problem, sim)
 
 def get_put_away_plates_goal(sim):
     goal = 'plate'
@@ -68,8 +63,17 @@ def get_wash_then_put_away_plates_goal(sim):
     plates_str = f", ".join([f"{plate['class_name']}_{plate['id']}" for plate in plates[:-1]])
     return goals, f"Wash these plates: {plates_str}, and {plates[-1]['class_name']}_{plates[-1]['id']} in the {sink_node['class_name']}_{sink_node['id']} then put them into the {cabinet_node['class_name']}_{cabinet_node['id']}"
 
-def get_put_salmon_in_fridge_goal(sim):
+def get_put_apple_in_fridge_goal(sim : AI2ThorSimEnv):
     graph = sim.get_graph()
+    apple = [node for node in graph["objects"] if "Apple" in node["objectId"]][0]
+    fridge = [node for node in graph["objects"] if "Fridge" in node["objectId"]][0]
+    print("graph expanded")
+    print(fridge)
+    goals = [f"INSIDE {apple['objectId']} {fridge['objectId']}"]
+    return goals, f"put the {apple['objectId']} in the {fridge['objectId']}."
+
+def get_put_salmon_in_fridge_goal(sim):
+    graph = sim.get_state()
     salmon = [node for node in graph["nodes"] if node["class_name"] == "salmon"][0]
     fridge = [node for node in graph["nodes"] if node["class_name"] == "fridge"][0]
     new_node = sim.create_waypoint(fridge)
@@ -133,11 +137,17 @@ def get_cook_salmon_put_away_plates_goal(sim):
             f"Cook the {salmon['class_name']}_{salmon['id']} in the {microwave['class_name']}_{microwave['id']}, then put it on the {table_node['class_name']}_{table_node['id']}."
             + f"Put these plates: {plates_str}, and {plates[-1]['class_name']}_{plates[-1]['id']} into the {cabinet_node['class_name']}_{cabinet_node['id']}")
 
-parsed_goals, nl_goals = get_cook_salmon_put_away_plates_goal(sim)
+
+
+problem = VirtualHomeProblem()
+sim = AI2ThorSimEnv()
+# bowl = sim.set_up_cereal_env()
+planner = PDDLPlanner(sim)
+parsed_goals, nl_goals = get_put_apple_in_fridge_goal(sim)
 print(parsed_goals, nl_goals)
 # sim.comm.activate_physics(gravity=0)
 
 print(parsed_goals)
 planner.set_goal(parsed_goals, nl_goals)
-planner.sim.comm.activate_physics()
+# planner.sim.comm.activate_physics()
 print(planner.solve(None))

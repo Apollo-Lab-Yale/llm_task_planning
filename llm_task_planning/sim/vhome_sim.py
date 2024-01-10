@@ -1,6 +1,7 @@
 # from virtualhome.simulation.unity_simulator.comm_unity import UnityCommunication
 from simulation.unity_simulator.comm_unity import UnityCommunication
 from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhome, get_object, get_object_by_category, build_state, format_state, UTILITY_SIM_PATH
+from llm_task_planning.problem.utils import parse_instantiated_predicate
 import sys
 import time
 import numpy as np
@@ -254,3 +255,41 @@ class VirtualHomeSimEnv:
         self.add_character()
 
         return [node for node in self.get_graph()["nodes"] if node["class_name"] == "dishbowl"][-1]
+
+    def execute_actions(self, actions, state=None):
+        success, msg = self.comm.render_script(actions, frame_rate=60)
+        return success, msg[val]["message"]
+
+    CHAR_RELATIONS = ("INSIDE", "HOLDS_RH")
+
+    def get_robot_state(self, state, robot="character", relations=CHAR_RELATIONS):
+        robot_state = ""
+        holding = False
+        location = None
+        for literal in state["object_relations"]:
+            if robot in literal:
+                relation, params = parse_instantiated_predicate(literal)
+                if relation in relations:
+                    if relation == "HOLDS_RH":
+                        holding = True
+                        robot_state += f" I am holding {params[1]}."
+                    else:
+                        robot_state += f" I am inside the {params[1]}."
+                        location = params[1].replace('.', '')
+        if not holding:
+            robot_state += " I am not holding anything."
+        return robot_state, location
+
+    def get_world_predicate_set(self, graph, custom_preds=()):
+        predicates = set()
+        id_map = {}
+        for obj in graph["nodes"]:
+            id_map[obj["id"]] = obj['class_name']
+            for pred in obj["properties"] + obj["states"]:
+                predicates.add(f"{pred} {obj['class_name']}_{obj['id']}")
+        for edge in graph["edges"]:
+            relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
+            predicates.add(relation)
+        for pred in custom_preds:
+            predicates.add(pred)
+        return predicates

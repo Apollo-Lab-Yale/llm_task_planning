@@ -2,9 +2,9 @@ from llm_task_planning.llm import openai_interface
 from llm_task_planning.sim import VirtualHomeSimEnv
 from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 from llm_task_planning.sim.utils import translate_action_for_sim, get_relevant_relations
-from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
-from llm_task_planning.problem.virtualhome.vh_resolution_tree import get_all_valid_actions, resolve_nonvisible, resolve_not_holding, resolve_off, resolve_on, resolve_place_object, resolve_not_ontop, resolve_not_inside, get_object_properties_and_states, resolve_open, resolve_closed, get_world_predicate_set, resolve_cooked, \
-    resolve_wash_obj1_in_obj2
+from llm_task_planning.problem.virtualhome.vh_resolution_tree import get_all_valid_actions, resolve_nonvisible, resolve_not_holding, resolve_off, resolve_on, resolve_place_object, resolve_not_ontop, resolve_not_inside, resolve_open, resolve_closed, get_world_predicate_set, resolve_cooked, \
+    resolve_wash_obj1_in_obj2#, get_object_properties_and_states
+from llm_task_planning.sim.ai2_thor.utils import get_object_properties_and_states, preds_dict_to_set
 from llm_task_planning.problem.utils import parse_instantiated_predicate, get_robot_state
 from llm_task_planning.planner.utils import extract_actions, generate_next_action_prompt, parse_response, generate_goal_prompt, generate_cooked_prompt, generate_next_action_prompt_combined, \
     generate_next_action_prompt_short, build_goal_pred_prompt, fix_obj1_on_obj2, pddl_relations_to_nl
@@ -32,8 +32,7 @@ Option2:
 
 
 class PDDLPlanner:
-    def __init__(self, problem : VirtualHomeProblem, sim_env, retain_memory=False):
-        self.problem = problem
+    def __init__(self, sim_env, retain_memory=False):
         self.sim = sim_env
         self.goal = set()
         self.retain_memory = retain_memory
@@ -76,8 +75,8 @@ class PDDLPlanner:
             state = self.sim.get_state(goal_objs=goal_objects)
             self.memory.update_memory(state)
             self.memory.object_waypoints = self.sim.object_waypoints
-            robot_state, location = get_robot_state(state)
-            self.get_item_states()
+            robot_state, location = self.sim.get_robot_state(state)
+            # self.get_item_states()
             self.robot_location = location
             goal = self.goal
             actions = set()
@@ -97,8 +96,8 @@ class PDDLPlanner:
                 self.all_llm_responses.append("")
                 self.last_failure = ""
                 return list(actions)[0], state
-            rooms = [f"{room['class_name']}_{room['id']}" for room in state["rooms"]]
-            relevant_relations =  pddl_relations_to_nl(get_relevant_relations(state["object_relations"], rooms=rooms))
+            # rooms = [f"{room['class_name']}_{room['id']}" for room in state["rooms"]]
+            relevant_relations = None# pddl_relations_to_nl(get_relevant_relations(state["object_relations"], rooms=rooms))
 
             _, goal_objects = parse_instantiated_predicate(sub_goal)
             goal_memory = [pddl_relations_to_nl(self.memory.object_states[obj]) for obj in goal_objects if obj in self.memory.object_states]
@@ -139,7 +138,7 @@ class PDDLPlanner:
                 continue
             selected_action = selected_action[0]
             if selected_action not in actions:
-                self.last_failure = f"I failed to complete the previous action {selected_action}, because it was not in the set actions I provided. Only select actions that exactly match an entry in the set I provide."
+                self.last_failure = f"I failed to complete the previous action {selected_action}, because it is IMPOSSIBLE in my current state. Only select actions that exactly match an entry in the set I provide."
                 continue
             return selected_action, state
 
@@ -157,7 +156,7 @@ class PDDLPlanner:
             if "scanroom" in action:
                 print(f"Executing action: {action}")
                 sim_planning_start = time.time()
-                success = self.sim.handle_scan_room(action.split()[-1].replace("?",""), self.memory)
+                success = self.sim.handle_scan_room(action.split()[-1], self.memory)
                 self.sim_planning_time += time.time() - sim_planning_start
                 if not success:
                     self.last_failure = f"The action {action} failed. The object is not visible from my current location, do not repeat this action until moving locations."
@@ -166,7 +165,7 @@ class PDDLPlanner:
             sim_action_list = self.sim.translate_action_for_sim(action, state)
             print(f"Executing script: {sim_action_list}")
             sim_planning_start = time.time()
-            success, msg = self.sim.comm.render_script(sim_action_list, frame_rate=60)
+            success, msg = self.sim.execute_actions(sim_action_list, state=self.sim.get_state())
             if success and "put" in action:
                 _, objs = parse_instantiated_predicate(action)
                 self.sim.add_object_waypoint(objs[0], objs[1])
@@ -174,10 +173,10 @@ class PDDLPlanner:
             self.actions_taken.append(f"{action}")
             if not success:
                 print(msg)
-                if any("REASON: Path partially completed" in msg[val]["message"] for val in msg):
-                    return False, -1
+                # if any("REASON: Path partially completed" in msg[val]["message"] for val in msg):
+                #     return False, -1
                 self.last_failure = f"I failed to perform action: {action} due to blocking condition."
-            if self.check_satisfied(get_world_predicate_set(self.sim.get_graph())):
+            if self.check_satisfied(self.sim.get_world_predicate_set(self.sim.get_graph())):
                 print("Task success!")
                 return True, 0
         print("Max actions taken, task failed.")
@@ -202,7 +201,8 @@ class PDDLPlanner:
 
     def get_feasible_actions(self, goal, state, memory):
         relation, params = parse_instantiated_predicate(goal)
-        obj_preds = get_object_properties_and_states(state)
+        obj_preds_dict = get_object_properties_and_states(state)
+        obj_preds = preds_dict_to_set(obj_preds_dict)
         rooms = state["room_names"]
         for param in params:
             param.replace("?", "")

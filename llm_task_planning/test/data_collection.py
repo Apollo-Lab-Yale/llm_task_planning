@@ -93,7 +93,7 @@ def main():
     problem = None
     planner = None
     if args.planner == "PDDLPlanner":
-        planner = PDDLPlanner(problem, sim)
+        planner = PDDLPlanner(sim)
     if args.planner == "ProgPrompt":
         planner = ProgPromptPlanner(sim)
     # Create a new directory with the current datetime

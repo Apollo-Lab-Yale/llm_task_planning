@@ -1,4 +1,7 @@
-
+import copy
+from PIL import Image
+import math
+import numpy as np
 
 AI2THOR_PREDICATES = [
     'visible',
@@ -37,14 +40,15 @@ AI2THOR_TO_VHOME = {
     'pickupable': 'GRABBABLE',
     'isPickedUp': 'HOLDS',
     'onTop': 'ON_TOP',
-    'moveable': "MOVEABLE"
+    'moveable': "MOVEABLE",
+    "isOpen": 'OPEN'
 }
 
-CLOSE_DISTANCE = 1
+CLOSE_DISTANCE = 1.75
 
 def get_vhome_to_thor_dict():
     vhome_to_thor = {}
-    for key, val in AI2THOR_PREDICATES:
+    for key, val in AI2THOR_TO_VHOME.items():
         vhome_to_thor[val] = key
     vhome_to_thor["CONTAINER"] = 'receptacle'
     return vhome_to_thor
@@ -95,8 +99,43 @@ def is_in_room(point, polygon):
 
     return inside
 
+def is_facing(reference_position, reference_rotation, target_position):
+    """
+    Check if the reference position with given rotation is facing the target position.
 
-def find_closest_position(point, positions):
+    Args:
+    reference_position -- A dict {'x': x_val, 'y': y_val, 'z': z_val} for the reference position.
+    reference_rotation -- A dict {'x': x_val, 'y': y_val, 'z': z_val} for the reference rotation in degrees.
+    target_position -- A dict {'x': x_val, 'y': y_val, 'z': z_val} for the target position.
+
+    Returns:
+    True if the reference position is facing the target position; False otherwise.
+    """
+
+    # Calculate forward vector from rotation
+    yaw = math.radians(reference_rotation['y'])
+    forward_vector = {
+        'x': math.cos(yaw),
+        'z': math.sin(yaw)
+    }
+
+    # Calculate the vector from reference to target position
+    direction_to_target = {
+        'x': target_position['x'] - reference_position['x'],
+        'z': target_position['z'] - reference_position['z']
+    }
+
+    # Normalize direction_to_target vector
+    mag = math.sqrt(direction_to_target['x'] ** 2 + direction_to_target['z'] ** 2)
+    direction_to_target = {k: v / mag for k, v in direction_to_target.items()}
+
+    # Dot product of forward_vector and direction_to_target
+    dot_product = forward_vector['x'] * direction_to_target['x'] + forward_vector['z'] * direction_to_target['z']
+
+    # Check if the reference is facing the target (dot product close to 1)
+    return dot_product > .25  # Adjust this threshold as needed
+
+def find_closest_position(point, orientation, positions, radius = .5, facing=False):
     """
     Find the closest position to a reference point.
 
@@ -117,8 +156,86 @@ def find_closest_position(point, positions):
 
     for pos in positions:
         dist = distance(point, pos)
-        if dist < min_distance:
+        if min_distance > dist >= radius:
+            if facing and not is_facing(point, orientation, pos):
+                continue
             min_distance = dist
             closest_position = pos
 
     return closest_position
+
+
+def get_top_down_frame(sim):
+    # Setup the top-down camera
+    event = sim.controller.step(action="GetMapViewCameraProperties", raise_for_failure=True)
+    pose = copy.deepcopy(event.metadata["actionReturn"])
+
+    bounds = event.metadata["sceneBounds"]["size"]
+    max_bound = max(bounds["x"], bounds["z"])
+
+    pose["fieldOfView"] = 50
+    pose["position"]["y"] += 1.1 * max_bound
+    pose["orthographic"] = False
+    pose["farClippingPlane"] = 50
+    del pose["orthographicSize"]
+
+    # add the camera to the scene
+    event = sim.controller.step(
+        action="AddThirdPartyCamera",
+        **pose,
+        skyboxColor="white",
+        raise_for_failure=True,
+    )
+    top_down_frame = event.third_party_camera_frames[-1]
+    return Image.fromarray(top_down_frame)
+
+
+def check_close(object):
+    return object["distance"] <= CLOSE_DISTANCE
+def get_object_properties_and_states(state):
+    global PREDICATES
+    object_properties_states = {}
+    object_properties_states["HOLDS"] = {}
+    object_properties_states["CLOSE"] = {}
+    object_properties_states["FAR"] = {}
+    object_properties_states["IN"] = {}
+    vhome_to_thor = get_vhome_to_thor_dict()
+    for object in state["objects"]:
+        is_close = check_close(object)
+        if is_close:
+            object_properties_states["CLOSE"][object["objectId"]] = object
+        else:
+            object_properties_states["FAR"][object["objectId"]] = object
+        for pred in vhome_to_thor:
+            if pred not in object_properties_states:
+                object_properties_states[pred] = {}
+            if object.get(vhome_to_thor[pred], False):
+                object_properties_states[pred][object["objectId"]] = object
+
+    return object_properties_states
+
+def preds_dict_to_set(object_properties_states):
+    new_dict = {}
+    for key in object_properties_states:
+        new_dict[key] = set(object_properties_states[key].keys())
+    return new_dict
+
+
+def get_world_predicate_set(graph, custom_preds=()):
+    return set(get_predicates(graph['objects']))
+
+
+def get_yaw_angle(pose1, pose2):
+    direction_vector = {
+        'x': pose1['x'] - pose2['x'],
+        'y': pose1['y'] - pose2['y'],
+        'z': pose1['z'] - pose2['z'],
+    }
+
+    angle = math.degrees(math.atan2(direction_vector['z'], direction_vector['x']))
+
+    # Normalize angle to be in the range [0, 360)
+    angle = angle % 360
+
+    return angle
+

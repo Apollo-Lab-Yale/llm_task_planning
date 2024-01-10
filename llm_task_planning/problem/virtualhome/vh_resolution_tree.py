@@ -9,7 +9,7 @@ nlp = spacy.load('en_core_web_md')
 MOVE_ACTION = "walk"
 N_ROOMS = 3
 N_OBJECTS = 5
-
+MAX_OBJ_HOLD = 2
 
 def check_close(goal_object, object_relations):
     return any([parse_instantiated_predicate(literal)[0] == "CLOSE"
@@ -59,32 +59,32 @@ def get_world_predicate_set(graph, custom_preds=()):
 
 def resolve_nonvisible(goal, obj_preds, rooms, memory: PlannerMemory):
     if goal in obj_preds["FAR"]:
-        return [f"walk {goal}"]
+        return [f"walk_to_object {goal}"]
     if goal not in obj_preds["CLOSE"] and any(obj in obj_preds["FAR"] for obj in memory.object_waypoints.get(goal, set())):
         waypoint = [obj for obj in memory.object_waypoints.get(goal, set()) if obj in obj_preds["FAR"]][0]
-        return [f"walk {waypoint}"]
+        return [f"walk_to_object {waypoint}"]
 
     if memory.is_object_known(goal):
         location = memory.get_object_location(goal)
         actions = []
         if location["room"] is not None:
-            actions.append(f"walk {location['room']}")
+            actions.append(f"walk_to_room {location['room']}")
         if location["container"] is not None:
             if location["container"] in obj_preds["FAR"]:
-                actions.append(f"walk {location['container']}")
+                actions.append(f"walk_to_object {location['container']}")
             elif location["container"] in obj_preds["CLOSE"].intersection(obj_preds["CLOSED"]):
                 actions.append(f"open {location['container']}")
             return actions
     actions = ["turnleft character", "turnright character"]
     for room in rooms:
-        actions.append(f"walk {room}")
+        actions.append(f"walk_to_room {room}")
     for object in obj_preds['CLOSE'].intersection(obj_preds["CAN_OPEN"]):
         if object in obj_preds["OPEN"]:
             actions.append(f"close {object}")
         else:
             actions.append(f"open {object}")
     for object in obj_preds["FAR"].intersection(obj_preds["CAN_OPEN"]):
-        actions.append(f"walk {object}")
+        actions.append(f"walk_to_object {object}")
     actions.append(f"scanroom {goal}")
     if goal in memory.object_states:
         for pred in memory.object_states[goal]:
@@ -100,7 +100,7 @@ def resolve_place_object(obj_preds, rooms):
             if surface in obj_preds["CLOSE"]:
                 actions.append(f"put {object} {surface}")
             if surface in obj_preds["FAR"]:
-                actions.append(f"walk {surface}")
+                actions.append(f"walk_to_object {surface}")
     if len(actions) == 0:
         actions += ["turnleft character", "turnright character"]
     return actions
@@ -339,13 +339,13 @@ def get_all_valid_actions(state, goals, current_room="", didScanRoom=False):
 
     for object in object_properties_states.get("FAR", set()):
         is_goal = object in goal_objects
-        valid_actions.append(f"walk character {object}")
+        valid_actions.append(f"walk_to_object character {object}")
         if is_goal:
             goal_actions.append(valid_actions[-1])
 
     for room in rooms:
         if room != current_room:
-            valid_actions.append(f"walk character {room}")
+            valid_actions.append(f"walk_to_room character {room}")
     goals_in_close = []
     goals_in_far = []
     # for goal in goals:
