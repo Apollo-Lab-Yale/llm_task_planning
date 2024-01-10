@@ -123,6 +123,7 @@ def resolve_not_inside(obj1, obj2, obj_preds, rooms, memory = None):
         return resolve_nonvisible(obj2, obj_preds, rooms, memory)
     if obj2 in obj_preds["CAN_OPEN"] and obj2 not in obj_preds["OPEN"]:
         return [f"open {obj2}"]
+    actions = [f"putin {obj1} {obj2}"]
     return [f"putin {obj1} {obj2}"]
 
 def resolve_not_ontop(obj1, obj2, obj_preds, rooms, memory = None):
@@ -150,6 +151,11 @@ def resolve_closed(obj1, obj_preds, rooms, memory = None):
     if obj1 not in obj_preds["CLOSE"]:
         return resolve_nonvisible(obj1, obj_preds, rooms, memory)
     return [f"open {obj1}"]
+
+def resolve_not_sliced(obj1, obj_preds, rooms, memory = None):
+    if obj1 not in obj_preds["CLOSE"]:
+        return resolve_nonvisible(obj1, obj_preds, rooms, memory)
+    return [f"slice {obj1}"]
 
 """
 """

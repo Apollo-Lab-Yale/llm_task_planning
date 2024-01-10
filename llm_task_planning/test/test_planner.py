@@ -72,16 +72,19 @@ def get_put_apple_in_fridge_goal(sim : AI2ThorSimEnv):
     goals = [f"INSIDE {apple['objectId']} {fridge['objectId']}"]
     return goals, f"put the {apple['objectId']} in the {fridge['objectId']}."
 
-def get_put_salmon_in_fridge_goal(sim):
-    graph = sim.get_state()
-    salmon = [node for node in graph["nodes"] if node["class_name"] == "salmon"][0]
-    fridge = [node for node in graph["nodes"] if node["class_name"] == "fridge"][0]
-    new_node = sim.create_waypoint(fridge)
-    sim.add_object_waypoint(f"{fridge['class_name']}_{fridge['id']}", f"{new_node['class_name']}_{new_node['id']}")
-    print("graph expanded")
-    print(fridge)
-    goals = [f"INSIDE {salmon['class_name']}_{salmon['id']} {fridge['class_name']}_{fridge['id']}"]
-    return goals, f"put the {salmon['class_name']}_{salmon['id']} in the {fridge['class_name']}_{fridge['id']}."
+def get_slice_bread(sim):
+    graph = sim.get_graph()
+    bread = [node for node in graph["objects"] if "Bread" in node["objectId"]][0]
+    goals = [f"SLICED {bread['objectId']}"]
+    return goals, f"slice the {bread['objectId']}."
+
+def get_make_toast(sim):
+    graph = sim.get_graph()
+    bread = [node for node in graph["objects"] if "Bread" in node["objectId"]][0]
+    toaster = [node for node in graph["objects"] if "Toaster" in node["objectId"]][0]
+
+    goals = [f"SLICED {bread['objectId']}"]
+    return goals, f"slice the {bread['objectId']}."
 
 def get_cook_salmon_in_microwave_goal(sim):
     graph = sim.get_graph()
@@ -143,7 +146,7 @@ problem = VirtualHomeProblem()
 sim = AI2ThorSimEnv()
 # bowl = sim.set_up_cereal_env()
 planner = PDDLPlanner(sim)
-parsed_goals, nl_goals = get_put_apple_in_fridge_goal(sim)
+parsed_goals, nl_goals = get_slice_bread(sim)
 print(parsed_goals, nl_goals)
 # sim.comm.activate_physics(gravity=0)
 

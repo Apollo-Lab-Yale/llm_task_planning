@@ -6,10 +6,7 @@ from llm_task_planning.sim.ai2_thor.utils import get_top_down_frame
 sim = AI2ThorSimEnv()
 event = sim.turn_left()
 graph = sim.get_graph()
-fridge = [node for node in graph["objects"] if "Fridge" in node["objectId"]][0]
-sim.navigate_to_object(fridge)
-sim.open_object(fridge)
-sim.turn_left(degrees=30)
-sim.turn_left(degrees=1)
-# print(fridge)
+for obj in graph["objects"]:
+    if obj['salientMaterials'] is not None and 'Food' in obj['salientMaterials']:
+        print(obj)
 input()

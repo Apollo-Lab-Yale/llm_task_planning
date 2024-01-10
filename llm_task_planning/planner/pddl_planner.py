@@ -3,7 +3,7 @@ from llm_task_planning.sim import VirtualHomeSimEnv
 from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 from llm_task_planning.sim.utils import translate_action_for_sim, get_relevant_relations
 from llm_task_planning.problem.virtualhome.vh_resolution_tree import get_all_valid_actions, resolve_nonvisible, resolve_not_holding, resolve_off, resolve_on, resolve_place_object, resolve_not_ontop, resolve_not_inside, resolve_open, resolve_closed, get_world_predicate_set, resolve_cooked, \
-    resolve_wash_obj1_in_obj2#, get_object_properties_and_states
+    resolve_wash_obj1_in_obj2, resolve_not_sliced#, get_object_properties_and_states
 from llm_task_planning.sim.ai2_thor.utils import get_object_properties_and_states, preds_dict_to_set
 from llm_task_planning.problem.utils import parse_instantiated_predicate, get_robot_state
 from llm_task_planning.planner.utils import extract_actions, generate_next_action_prompt, parse_response, generate_goal_prompt, generate_cooked_prompt, generate_next_action_prompt_combined, \
@@ -34,9 +34,9 @@ Option2:
 class PDDLPlanner:
     def __init__(self, sim_env, retain_memory=False):
         self.sim = sim_env
-        self.goal = set()
+        self.goal = []
         self.retain_memory = retain_memory
-        self.nl_goal = set()
+        self.nl_goal = []
         self.abstract_state = "I am not sure."
         setup_openai()
         self.conversation = []
@@ -176,28 +176,18 @@ class PDDLPlanner:
                 # if any("REASON: Path partially completed" in msg[val]["message"] for val in msg):
                 #     return False, -1
                 self.last_failure = f"I failed to perform action: {action} due to blocking condition."
-            if self.check_satisfied(self.sim.get_world_predicate_set(self.sim.get_graph())):
+            satisfied, to_remove = self.sim.check_satisfied(self.sim.get_world_predicate_set(self.sim.get_graph()), self.goal[0])
+            if satisfied:
+                for sub_goal in to_remove:
+                    relation, params = parse_instantiated_predicate(sub_goal)
+                    self.completed_goals.append(f"I successfully completed the pddl goal: {sub_goal}!")
+                    self.goal.remove(sub_goal)
+            if len(self.goal)==0:
                 print("Task success!")
                 return True, 0
         print("Max actions taken, task failed.")
         return False, 0
 
-
-    def check_satisfied(self, predicates):
-        to_remove = []
-        sub_goal = self.goal[0]
-        if sub_goal in predicates:
-            print(f"{sub_goal} SATISFIED!")
-            to_remove.append(sub_goal)
-        elif "COOKED" in sub_goal or "WASHED" in sub_goal:
-            relation, params = parse_instantiated_predicate(sub_goal)
-            if f"INSIDE {params[0]} {params[1]}" in predicates and f"ON {params[1]}" in predicates:
-                to_remove.append(sub_goal)
-        for sub_goal in to_remove:
-            relation, params = parse_instantiated_predicate(sub_goal)
-            self.completed_goals.append(f"I successfully completed the pddl goal: {sub_goal}!")
-            self.goal.remove(sub_goal)
-        return len(self.goal) == 0
 
     def get_feasible_actions(self, goal, state, memory):
         relation, params = parse_instantiated_predicate(goal)
@@ -224,6 +214,8 @@ class PDDLPlanner:
             return resolve_cooked(params[0], params[1], obj_preds, rooms, self.memory)
         if relation == "WASHED":
             return resolve_wash_obj1_in_obj2(params[0], params[1], obj_preds, rooms, self.memory)
+        if relation == "SLICED":
+            return resolve_not_sliced(params[0], obj_preds, rooms, self.memory)
 
     def set_goal(self, goal, nl_goal):
         self.goal = goal

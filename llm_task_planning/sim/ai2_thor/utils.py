@@ -41,7 +41,8 @@ AI2THOR_TO_VHOME = {
     'isPickedUp': 'HOLDS',
     'onTop': 'ON_TOP',
     'moveable': "MOVEABLE",
-    "isOpen": 'OPEN'
+    "isOpen": 'OPEN',
+    "isSliced": "SLICED"
 }
 
 CLOSE_DISTANCE = 1.75
@@ -235,7 +236,7 @@ def get_yaw_angle(pose1, pose2):
     angle = math.degrees(math.atan2(direction_vector['z'], direction_vector['x']))
 
     # Normalize angle to be in the range [0, 360)
-    angle = angle % 360
+    # angle = angle % 360
 
     return angle
 

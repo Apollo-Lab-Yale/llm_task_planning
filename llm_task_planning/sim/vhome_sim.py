@@ -260,6 +260,17 @@ class VirtualHomeSimEnv:
         success, msg = self.comm.render_script(actions, frame_rate=60)
         return success, msg[val]["message"]
 
+    def check_satisfied(self, predicates, sub_goal):
+        to_remove = []
+        if sub_goal in predicates:
+            print(f"{sub_goal} SATISFIED!")
+            to_remove.append(sub_goal)
+        elif "COOKED" in sub_goal or "WASHED" in sub_goal:
+            relation, params = parse_instantiated_predicate(sub_goal)
+            if f"INSIDE {params[0]} {params[1]}" in predicates and f"ON {params[1]}" in predicates:
+                to_remove.append(sub_goal)
+        return len(to_remove) > 0, to_remove
+
     CHAR_RELATIONS = ("INSIDE", "HOLDS_RH")
 
     def get_robot_state(self, state, robot="character", relations=CHAR_RELATIONS):

@@ -5,7 +5,7 @@ import time
 import prior
 from PIL import Image
 
-from llm_task_planning.sim.ai2_thor.utils import get_visible_objects, get_predicates, CLOSE_DISTANCE, find_closest_position, is_in_room, get_yaw_angle
+from llm_task_planning.sim.ai2_thor.utils import get_visible_objects, get_predicates, CLOSE_DISTANCE, find_closest_position, is_in_room, get_yaw_angle, get_vhome_to_thor_dict
 from llm_task_planning.problem.utils import parse_instantiated_predicate
 
 
@@ -34,7 +34,9 @@ class AI2ThorSimEnv:
             "cook": self.cook_object,
             "clean": self.clean_object,
             "switchon": self.turn_object_on,
-            "switchoff": self.turn_object_off}
+            "switchoff": self.turn_object_off,
+            "slice": self.slice_object
+        }
 
     def __del__(self):
         self.controller.stop()
@@ -101,6 +103,9 @@ class AI2ThorSimEnv:
     def move_back(self, meters=0.25):
         return self.controller.step("MoveBack", moveMagnitude=meters)
 
+    def slice_object(self, obj):
+        return self.controller.step("SliceObject", object=obj["objectId"])
+
     def navigate_to_room(self, target_room_str="bedroom"):
         target_room = None
         for room in self.scene["rooms"]:
@@ -111,7 +116,8 @@ class AI2ThorSimEnv:
         teleport_pose = np.random.choice(positions)
         return self.controller.step(
             action="Teleport",
-            position=teleport_pose
+            position=teleport_pose,
+            rotation={'x': 0.0, "y": np.random.uniform(0, 360), "z": 0.0}
         )
 
 
@@ -148,7 +154,7 @@ class AI2ThorSimEnv:
         return self.controller.step(
             action="Teleport",
             position=teleport_pose,
-            rotation={'x': 0.0, 'y': get_yaw_angle(teleport_pose, object['position']) - 30, 'z': 0.0}
+            rotation={'x': 0.0, 'y': get_yaw_angle(teleport_pose, object['position'])-15, 'z': 0.0}
         )
 
     def open_object(self, object):
@@ -276,8 +282,33 @@ class AI2ThorSimEnv:
             else:
                 target = objects[0] if len(objects) == 1 else objects[1]
                 event = self.action_fn_from_str[act](target)
+            # self.move_back(meters=.0000001)
             return event.metadata["lastActionSuccess"], event.metadata['errorMessage']
 
 
     def get_world_predicate_set(self, graph, custom_preds=()):
         return set(get_predicates(graph['objects']))
+
+    def check_obj_contained(self, obj, receptacle):
+        state = self.get_graph()
+        receptacle = [object for object in state["objects"] if object["objectId"] == receptacle][0]
+        return obj in receptacle['receptacleObjectIds']
+
+    def check_satisfied(self, predicates, sub_goal):
+        to_remove = []
+        success = False
+        pred, params = parse_instantiated_predicate(sub_goal)
+        if "INSIDE" in sub_goal or ("ON" in sub_goal and len(params) == 2):
+            success = self.check_obj_contained(params[0], params[1])
+            if success:
+                to_remove.append(sub_goal)
+        else:
+            vhome_to_aithor = get_vhome_to_thor_dict()
+            key = vhome_to_aithor.get(pred, None)
+            assert key is not None
+            state = self.get_graph()
+            obj = [object for object in state["objects"] if object["objectId"] == params[0]][0]
+            success = obj[key]
+            if success:
+                to_remove.append(sub_goal)
+        return success, to_remove
