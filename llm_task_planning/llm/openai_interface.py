@@ -38,9 +38,9 @@ def add_messages_to_conversation(messages, speaker, conversation):
     for message in messages:
         conversation.append({
             "role": speaker,
-            "content": str(message[:4096])
+            "content": str(message)
         })
     total_message_size = sum(len(message["content"]) for message in conversation)
-    if total_message_size > 8000:
-        conversation = conversation[len(conversation)//2:]
+    # if total_message_size > 8000:
+    #     conversation = conversation[len(conversation)//2:]
     return conversation

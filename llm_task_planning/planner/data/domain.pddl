@@ -13,6 +13,7 @@
     (closed ?obj - Object)
     (active ?obj)
     (off ?obj - Object)
+    (breakable ?obj - Object)
     (can_open ?obj - Object)
     (grabbable ?obj - Object)
     (sittable ?obj - Object)
@@ -32,8 +33,14 @@
     (cover_object ?obj - Object)
     (cream ?obj - Object)
     (pourable ?obj - Object)
-    (movable ?obj - Object)
+    (moveable ?obj - Object)
+    (toggleable ?obj - Object)
     (recipient ?obj - Object)
+    (receptacle ?obj - Object)
+    (pickupable ?obj - Object)
+    (dirty ?obj)
+    (water_source ?obj)
+    (cleaning_target ?obj)
     (on ?obj1 - Object ?obj2 - Object)
     (inside ?obj1 ?obj2)
     (facing ?obj1 - Object ?obj2 - Object)
@@ -48,10 +55,12 @@
     (can_cook ?cont)
     (cooked ?obj ?cont)
     (in_room ?character ?room)
+    (sliceable ?obj)
+    (sliced ?obj)
   )
 
   ; Actions
-    (:action walk
+    (:action walk_to_object
         :parameters (?character - Character ?obj1 - Object)
         :precondition (and (standing ?character) (visible ?obj1))
         :effect (and (close ?character ?obj1)
@@ -59,7 +68,7 @@
                     (visible ?obj1))
              )
 
-    (:action walk
+    (:action walk_to_room
         :parameters (?character - Character ?room - Room)
         :precondition (standing ?character)
         :effect (and
@@ -157,6 +166,32 @@
                       )
         :effect (and
                   (cooked ?obj ?cont)
+                )
+      )
+
+     (:action slice
+        :parameters (?obj ?character)
+        :precondition (and
+                        (sliceable ?obj)
+                        (close ?character ?obj)
+                      )
+        :effect (and
+                  (sliced ?obj)
+                )
+      )
+
+      (:action wash_in_sink
+      :parameters (?obj1 ?obj2 ?obj3)
+      :precondition (and
+                        (dirty ?obj1)
+                        (inside ?obj1 ?obj2)
+                        (water_source ?obj3)
+                        (cleaning_target ?obj2)
+                        (has_switch ?obj3)
+                        (active ?obj3)
+                        )
+        :effect (and
+                  (not (dirty ?obj1))
                 )
       )
 )

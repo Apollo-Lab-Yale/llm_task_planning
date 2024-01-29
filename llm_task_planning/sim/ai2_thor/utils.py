@@ -39,7 +39,7 @@ AI2THOR_TO_VHOME = {
     'openable': 'CAN_OPEN',
     'pickupable': 'GRABBABLE',
     'isPickedUp': 'HOLDS',
-    'onTop': 'ON_TOP',
+    # 'onTop': 'ON_TOP',
     'moveable': "MOVEABLE",
     "isOpen": 'OPEN',
     "isSliced": "SLICED"
@@ -64,11 +64,11 @@ def get_visible_objects(object_meta):
 def get_predicates(objects):
     predicates = []
     for object in objects:
-        for pred in AI2THOR_PREDICATES:
+        for pred in AI2THOR_TO_VHOME.keys():
             if object[pred]:
-                predicates.append(f"{pred} {object['assetId']}")
+                predicates.append(f"{AI2THOR_TO_VHOME[pred]} {object['objectId']}")
         if object['distance'] < CLOSE_DISTANCE:
-            predicates.append(f"close {object['assetId']}")
+            predicates.append(f"close {object['objectId']} character_1")
     return predicates
 
 def is_in_room(point, polygon):
@@ -82,7 +82,8 @@ def is_in_room(point, polygon):
     Returns:
     True if the point is in the polygon; False otherwise.
     """
-
+    if polygon == -1:
+        return True
     x, z, y = point['x'], point['y'], point['z']
     inside = False
 
@@ -201,17 +202,21 @@ def get_object_properties_and_states(state):
     object_properties_states["FAR"] = {}
     object_properties_states["IN"] = {}
     vhome_to_thor = get_vhome_to_thor_dict()
-    for object in state["objects"]:
-        is_close = check_close(object)
+    for obj in state["objects"]:
+        is_close = check_close(obj)
         if is_close:
-            object_properties_states["CLOSE"][object["objectId"]] = object
+            object_properties_states["CLOSE"][obj["objectId"]] = obj
         else:
-            object_properties_states["FAR"][object["objectId"]] = object
+            object_properties_states["FAR"][obj["objectId"]] = obj
         for pred in vhome_to_thor:
             if pred not in object_properties_states:
                 object_properties_states[pred] = {}
-            if object.get(vhome_to_thor[pred], False):
-                object_properties_states[pred][object["objectId"]] = object
+            if pred == "ON_TOP":
+                if obj["parentReceptacles"] is not None and len(obj["parentReceptacles"]):
+                    object_properties_states["ON_TOP"][(obj["objectId"], obj["parentReceptacles"][0])] = obj
+                    object_properties_states["IN"][(obj["objectId"], obj["parentReceptacles"][0])] = obj
+            elif obj.get(vhome_to_thor[pred], False):
+                object_properties_states[pred][obj["objectId"]] = obj
 
     return object_properties_states
 
@@ -226,17 +231,40 @@ def get_world_predicate_set(graph, custom_preds=()):
     return set(get_predicates(graph['objects']))
 
 
-def get_yaw_angle(pose1, pose2):
-    direction_vector = {
-        'x': pose1['x'] - pose2['x'],
-        'y': pose1['y'] - pose2['y'],
-        'z': pose1['z'] - pose2['z'],
-    }
+# def get_yaw_angle(pose1, pose2):
+#     direction_vector = {
+#         'x': pose1['x'] - pose2['x'],
+#         'y': pose1['y'] - pose2['y'],
+#         'z': pose1['z'] - pose2['z'],
+#     }
+#
+#     angle = math.degrees(math.atan2(direction_vector['z'], direction_vector['x']))
+#
+#     # Normalize angle to be in the range [0, 360)
+#     angle = angle % 360
+#
+#     return angle
 
-    angle = math.degrees(math.atan2(direction_vector['z'], direction_vector['x']))
+def get_yaw_angle(pose1, orientation, pose2):
+    x1, y1 = pose1['x'], pose1['z']
+    x2, y2 = pose2['x'], pose2['z']
+    # Calculate the angle from the first point to the second point
+    angle_to_second_point = math.degrees(math.atan2(y2 - y1, x2 - x1))
 
-    # Normalize angle to be in the range [0, 360)
-    # angle = angle % 360
+    # Adjust for the orientation of the first point
+    relative_angle = angle_to_second_point - orientation['y']
 
-    return angle
+    # Normalize the angle to be between 0 and 360 degrees
+    relative_angle = relative_angle % 360
 
+    return relative_angle
+
+def get_room_polygon(scene, room):
+    try:
+        room = [room for room in scene['rooms'] if room["roomType"].lower() == room][0]
+        return room["floorPolygon"]
+    except:
+        raise Exception(f"Failed to find room {room}.")
+
+def get_inf_floor_polygon():
+    return -1

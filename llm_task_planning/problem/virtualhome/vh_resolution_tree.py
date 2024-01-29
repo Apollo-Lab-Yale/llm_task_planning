@@ -78,7 +78,7 @@ def resolve_nonvisible(goal, obj_preds, rooms, memory: PlannerMemory):
     actions = ["turnleft character", "turnright character"]
     for room in rooms:
         actions.append(f"walk_to_room {room}")
-    for object in obj_preds['CLOSE'].intersection(obj_preds["CAN_OPEN"]):
+    for object in obj_preds['CLOSE'].intersection(obj_preds.get("CAN_OPEN", dict())):
         if object in obj_preds["OPEN"]:
             actions.append(f"close {object}")
         else:
@@ -135,6 +135,14 @@ def resolve_not_ontop(obj1, obj2, obj_preds, rooms, memory = None):
     if obj2 in obj_preds["CAN_OPEN"] and obj2 not in obj_preds["OPEN"]:
         return [f"open {obj2}"]
     return [f"put {obj1} {obj2}"]
+
+def resolve_wash_in_sink(obj, sink, faucet, obj_preds, rooms, memory=None):
+    if (obj, sink) not in obj_preds['IN']:
+        return resolve_not_inside(obj, sink, obj_preds, rooms, memory)
+
+    return resolve_off(faucet, obj_preds, rooms, memory)
+
+
 
 def resolve_off(obj1, obj_preds, rooms, memory = None):
     print("resolve off")

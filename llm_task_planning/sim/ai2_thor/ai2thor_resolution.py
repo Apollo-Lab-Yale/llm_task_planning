@@ -55,6 +55,7 @@ def get_object_properties_and_states(state):
     object_properties_states["HOLDS"] = {}
     object_properties_states["CLOSE"] = {}
     object_properties_states["FAR"] = {}
+    object_properties_states['CAN_OPEN'] = {}
     vhome_to_thor = get_vhome_to_thor_dict()
     for object in state["objects"]:
         is_close = check_close(object)

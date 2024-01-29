@@ -3,6 +3,5 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/llm_task_planning/planner/contingent_ff" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/llm_task_planning/planner/downward" vcs="Git" />
   </component>
 </project>

@@ -5,20 +5,34 @@ import time
 import prior
 from PIL import Image
 
-from llm_task_planning.sim.ai2_thor.utils import get_visible_objects, get_predicates, CLOSE_DISTANCE, find_closest_position, is_in_room, get_yaw_angle, get_vhome_to_thor_dict
+from llm_task_planning.sim.ai2_thor.utils import get_visible_objects, get_predicates, CLOSE_DISTANCE, find_closest_position, is_in_room, get_yaw_angle, get_vhome_to_thor_dict, get_inf_floor_polygon
 from llm_task_planning.problem.utils import parse_instantiated_predicate
 
+def get_ithor_scene_single_room(room, index = -1):
+    kitchens = [f"FloorPlan{i}" for i in range(1, 31)]
+    living_rooms = [f"FloorPlan{200 + i}" for i in range(1, 31)]
+    bedrooms = [f"FloorPlan{300 + i}" for i in range(1, 31)]
+    bathrooms = [f"FloorPlan{400 + i}" for i in range(1, 31)]
+    rooms = []
+    if "kitchen" in room.lower():
+        rooms = kitchens
+    if "livingroom" in room.lower().replace("_", ""):
+        rooms = living_rooms
+    if "bedroom" in room.lower():
+        rooms = bedrooms
+    if "bathroom" in room.lower():
+        rooms = bathrooms
+    assert len(rooms) > 0
+    index = np.random.uniform(1, 30) if index == -1 else index
+    return rooms[int(index)]
 
 class AI2ThorSimEnv:
-    def __init__(self, scene_index=3, width=600, height=600, gridSize=0.25, visibilityDistance=10):
-        dataset = prior.load_dataset("procthor-10k")
-        scene = dataset["train"][scene_index]
-        self.scene = scene
-        self.controller = Controller(scene=scene, agentMode="default",
-                                     visibilityDistance=visibilityDistance, width=width,
-                                     height=height, allowAutoSimulation=True, gridSize=gridSize)
-        self.scene = scene
-        # self.controller.reset(scene)
+    def __init__(self, scene_index=3, width=600, height=600, gridSize=0.25, visibilityDistance=10, single_room='kitchen'):
+        self.single_room = single_room
+        self.scene = None
+        self.controller = None
+        self.comm = self
+        self.reset(scene_index, width, height, gridSize, visibilityDistance, single_room)
         self.valid_positions = self.get_valid_positions()
         self.object_waypoints = {}
         self.action_fn_from_str = {
@@ -35,8 +49,24 @@ class AI2ThorSimEnv:
             "clean": self.clean_object,
             "switchon": self.turn_object_on,
             "switchoff": self.turn_object_off,
-            "slice": self.slice_object
+            "slice": self.slice_object,
+            "find": self.cheat_and_find_object,
+            "give-up": self.give_up
         }
+
+    def reset(self, scene_index=3, width=600, height=600, gridSize=0.25, visibilityDistance=10, single_room='kitchen'):
+        scene = None
+        if scene_index == -1:
+            scene = get_ithor_scene_single_room(single_room)
+        else:
+            dataset = prior.load_dataset("procthor-10k")
+            scene = dataset["train"][scene_index]
+        self.scene = scene
+        self.controller = Controller(scene=scene, agentMode="default",
+                                     visibilityDistance=visibilityDistance, width=width,
+                                     height=height, allowAutoSimulation=True, gridSize=gridSize)
+        if type(scene) is str:
+            self.scene = {"rooms": [{"roomType": single_room, "floorPolygon": get_inf_floor_polygon()}]}
 
     def __del__(self):
         self.controller.stop()
@@ -48,9 +78,8 @@ class AI2ThorSimEnv:
                 return obj['position']
         return None
 
+
     def get_state(self, goal_objs=None):
-        # AI2-THOR provides a different way of getting state information.
-        # This is an example to get the metadata of the last event.
         event = self.controller.last_event.metadata
         state = {}
         state["objects"] = get_visible_objects(event["objects"])
@@ -78,9 +107,15 @@ class AI2ThorSimEnv:
             nl_state+= " I am not holding anything."
         else:
             holding_str = ", ".join(holding)
-            nl_state+=f" I am holding the following objects: {holding_str}."
+            nl_state+=f" I am holding the {holding_str}."
         return nl_state, robot_room
 
+    def cheat_and_find_object(self, object):
+        print(object)
+        obj = [obj for obj in self.get_graph()['objects'] if object.lower() in obj['objectId'].lower()][0]
+        self.navigate_to_object(obj)
+        self.handle_scan_room(obj['objectId'], memory=None)
+        return self.controller.last_event
 
     def done(self):
         return self.controller.step(action="Done")
@@ -103,8 +138,9 @@ class AI2ThorSimEnv:
     def move_back(self, meters=0.25):
         return self.controller.step("MoveBack", moveMagnitude=meters)
 
-    def slice_object(self, obj):
-        return self.controller.step("SliceObject", object=obj["objectId"])
+    def give_up(self):
+        print("womp womp")
+        return self.navigate_to_room(target_room_str=self.single_room)
 
     def navigate_to_room(self, target_room_str="bedroom"):
         target_room = None
@@ -119,8 +155,6 @@ class AI2ThorSimEnv:
             position=teleport_pose,
             rotation={'x': 0.0, "y": np.random.uniform(0, 360), "z": 0.0}
         )
-
-
 
     def grab_object(self, object):
         assert object["distance"] <= CLOSE_DISTANCE
@@ -148,13 +182,15 @@ class AI2ThorSimEnv:
         return positions
 
     def navigate_to_object(self, object):
-        positions = self.get_interactable_poses(object)
-        teleport_pose = find_closest_position(object["position"], object["rotation"], positions, 1.2, facing=False)
+        positions = self.get_valid_positions()
+        teleport_pose = find_closest_position(object["position"], object["rotation"], positions, 1.25, facing=False)
         # teleport_pose = np.random.choice(positions)
+        assert teleport_pose is not None
         return self.controller.step(
             action="Teleport",
             position=teleport_pose,
-            rotation={'x': 0.0, 'y': get_yaw_angle(teleport_pose, object['position'])-15, 'z': 0.0}
+            rotation={'x': 0.0, 'y': get_yaw_angle(teleport_pose,{'y':0.0}, object['position']), 'z': 0.0},
+            forceAction=False
         )
 
     def open_object(self, object):
@@ -165,7 +201,7 @@ class AI2ThorSimEnv:
             forceAction=False
         )
 
-        Image.fromarray(event.frame).show("str")
+        # Image.fromarray(event.frame).show("str")
         return event
 
     def close_object(self, object):
@@ -174,12 +210,14 @@ class AI2ThorSimEnv:
             objectId=object['objectId'],
             forceAction=False
         )
+
     def cook_object(self, object):
         return self.controller.step(
             action="CookObject",
             objectId=object['objectid'],
             forceAction=False
         )
+
     def slice_object(self, object):
         return self.controller.step(
             action="SliceObject",
@@ -234,20 +272,22 @@ class AI2ThorSimEnv:
             forceAction=False
         )
 
+    def handle_fry_in_pan(self, object):
+        pass
+
     def drop_object(self):
         return self.controller.step(action="DropHandObject",
                              forceAction=False)
+
     def handle_scan_room(self, goal_obj, memory):
         print(f"scanning for object {goal_obj}")
         for i in range(12):
             self.turn_left(degrees=30)
             self.done()
             state = self.get_state()
-            if any(goal_obj == object["objectId"] for object in state['objects']):
+            if any([goal_obj == object["objectId"] for object in state['objects']]):
                 return True
         return False
-
-
 
     def translate_action_for_sim(self, action, state):
         return [action]
@@ -256,18 +296,38 @@ class AI2ThorSimEnv:
         pass
 
     def get_graph(self):
-        # TODO: what am  I going to do here
         return self.controller.last_event.metadata
+
+    def environment_graph(self):
+        graph = self.get_graph()
+        graph['nodes'] = graph['objects']
+        for node in graph['nodes']:
+            node['class_name'] = node['objectType']
+            node['id'] = '|'.join(node['objectId'].split('|')[1:])
+        return True, graph
 
     def check_cooked(self):
         pass
 
     def execute_actions(self, actions, state):
+        event = None
         for action in actions:
+            state = self.get_state()
             act, params = parse_instantiated_predicate(action)
             objects = []
+            print(f"Action: {action}")
+            if "find" in action:
+                event = self.cheat_and_find_object(params[0])
+                print(event.metadata["lastActionSuccess"], event.metadata['errorMessage'])
+                continue
+            new_action = f"{action}"
+            if act == 'walk':
+                new_action = f"walk_to_object"
+                if any(param in state['room_names'] for param in params):
+                    new_action = f"walk_to_room"
+                act = new_action
             for param in params:
-                if "character" in params:
+                if "character" in param:
                     continue
                 object = [obj for obj in state["objects"] if obj["objectId"] == param]
                 object = None if len(object) == 0 else object[0]
@@ -277,14 +337,15 @@ class AI2ThorSimEnv:
                     object = param
                 objects.append(object)
             event = None
+
             if len(objects) == 0:
                 event = self.action_fn_from_str[act]()
             else:
                 target = objects[0] if len(objects) == 1 else objects[1]
                 event = self.action_fn_from_str[act](target)
-            # self.move_back(meters=.0000001)
-            return event.metadata["lastActionSuccess"], event.metadata['errorMessage']
-
+                print(event.metadata["lastActionSuccess"], event.metadata['errorMessage'])
+            self.move_back(meters=0.01)
+        return event.metadata["lastActionSuccess"], event.metadata['errorMessage']
 
     def get_world_predicate_set(self, graph, custom_preds=()):
         return set(get_predicates(graph['objects']))
@@ -295,20 +356,24 @@ class AI2ThorSimEnv:
         return obj in receptacle['receptacleObjectIds']
 
     def check_satisfied(self, predicates, sub_goal):
+        state = self.get_graph()
         to_remove = []
         success = False
         pred, params = parse_instantiated_predicate(sub_goal)
-        if "INSIDE" in sub_goal or ("ON" in sub_goal and len(params) == 2):
+        if "INSIDE" in sub_goal or "IN" in sub_goal or ("ON" in sub_goal and len(params) == 2):
             success = self.check_obj_contained(params[0], params[1])
-            if success:
-                to_remove.append(sub_goal)
+        elif "WASHED" in pred:
+            param = params[0] if "character" not in params[0] else params[1]
+            obj = [object for object in state["objects"] if object["objectId"] == param][0]
+            success = not obj["isDirty"]
         else:
             vhome_to_aithor = get_vhome_to_thor_dict()
+
             key = vhome_to_aithor.get(pred, None)
             assert key is not None
-            state = self.get_graph()
-            obj = [object for object in state["objects"] if object["objectId"] == params[0]][0]
+            param = params[0] if "character" not in params[0] else params[1]
+            obj = [object for object in state["objects"] if object["objectId"] ==param][0]
             success = obj[key]
-            if success:
-                to_remove.append(sub_goal)
+        if success:
+            to_remove.append(sub_goal)
         return success, to_remove

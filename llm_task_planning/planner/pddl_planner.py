@@ -3,7 +3,7 @@ from llm_task_planning.sim import VirtualHomeSimEnv
 from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 from llm_task_planning.sim.utils import translate_action_for_sim, get_relevant_relations
 from llm_task_planning.problem.virtualhome.vh_resolution_tree import get_all_valid_actions, resolve_nonvisible, resolve_not_holding, resolve_off, resolve_on, resolve_place_object, resolve_not_ontop, resolve_not_inside, resolve_open, resolve_closed, get_world_predicate_set, resolve_cooked, \
-    resolve_wash_obj1_in_obj2, resolve_not_sliced#, get_object_properties_and_states
+    resolve_wash_obj1_in_obj2, resolve_not_sliced, resolve_wash_in_sink#, get_object_properties_and_states
 from llm_task_planning.sim.ai2_thor.utils import get_object_properties_and_states, preds_dict_to_set
 from llm_task_planning.problem.utils import parse_instantiated_predicate, get_robot_state
 from llm_task_planning.planner.utils import extract_actions, generate_next_action_prompt, parse_response, generate_goal_prompt, generate_cooked_prompt, generate_next_action_prompt_combined, \
@@ -55,6 +55,7 @@ class PDDLPlanner:
         self.robot_location = ""
         self.start_state = None
         self.completed_goals = []
+        self.rooms_scanned = {}
         self.memory = PlannerMemory()
 
     def reset_data(self):
@@ -86,6 +87,9 @@ class PDDLPlanner:
             sub_actions = self.get_feasible_actions(sub_goal, state, self.memory)
             if sub_actions is None:
                 continue
+            for i in range(len(sub_actions)):
+                if "scanroom" in sub_actions[i]:
+                    sub_actions[i] += f" {location}"
             if "scanroom" in self.last_failure:
                 sub_actions = [action for action in sub_actions if action != self.actions_taken[-1]]
 
@@ -105,7 +109,7 @@ class PDDLPlanner:
             print(goal_objects)
             print(goal_memory)
             print([self.memory.object_states[obj] for obj in goal_objects if obj in self.memory.object_states])
-            new_prompt = generate_next_action_prompt(actions, goal_memory, self.goal, robot_state, self.last_failure, self.actions_taken, relevant_relations, self.completed_goals)
+            new_prompt = generate_next_action_prompt(actions, goal_memory, self.nl_goal, robot_state, self.last_failure, self.actions_taken, relevant_relations, self.completed_goals, scanned_rooms=self.rooms_scanned)
             self.all_prompts.append(f"{new_prompt}")
             if self.last_failure != "":
                 if len(self.actions_taken) > 0 and "scanroom" in self.actions_taken[-1]:
@@ -156,8 +160,12 @@ class PDDLPlanner:
             if "scanroom" in action:
                 print(f"Executing action: {action}")
                 sim_planning_start = time.time()
-                success = self.sim.handle_scan_room(action.split()[-1], self.memory)
+                obj = action.split()[-1] if len(action.split()) == 2 else action.split()[-2]
+                success = self.sim.handle_scan_room(obj, self.memory)
                 self.sim_planning_time += time.time() - sim_planning_start
+                if obj not in self.rooms_scanned:
+                    self.rooms_scanned[obj] = []
+                self.rooms_scanned[obj].append(self.robot_location)
                 if not success:
                     self.last_failure = f"The action {action} failed. The object is not visible from my current location, do not repeat this action until moving locations."
                 self.actions_taken.append(action)
@@ -196,7 +204,7 @@ class PDDLPlanner:
         rooms = state["room_names"]
         for param in params:
             param.replace("?", "")
-        if relation == "HOLDS_RH":
+        if "HOLDS" in relation:
             return resolve_not_holding(params[1], obj_preds, rooms, self.memory)
         if relation == "INSIDE":
             return resolve_not_inside(params[0], params[1], obj_preds, rooms, self.memory)
@@ -216,6 +224,9 @@ class PDDLPlanner:
             return resolve_wash_obj1_in_obj2(params[0], params[1], obj_preds, rooms, self.memory)
         if relation == "SLICED":
             return resolve_not_sliced(params[0], obj_preds, rooms, self.memory)
+        if relation == "WASHED_SINK":
+            return resolve_wash_in_sink(params[0], params[1], params[2], obj_preds, rooms, self.memory)
+        raise f"No resolution function for relation {relation}."
 
     def set_goal(self, goal, nl_goal):
         self.goal = goal

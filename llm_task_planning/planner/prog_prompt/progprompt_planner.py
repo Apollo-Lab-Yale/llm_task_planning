@@ -36,6 +36,32 @@ import time
 from llm_task_planning.planner.prog_prompt.utils_execute import *
 from llm_task_planning.problem.utils import parse_instantiated_predicate
 
+def translate_plan_to_actions(plan):
+    """
+    Translate the plan into a list of individual actions with arguments.
+
+    Args:
+    plan -- A list containing the plan as a string.
+
+    Returns:
+    A list of action strings in the format '<action> <arg1> <arg2 (if present)>'.
+    """
+
+    # Join the plan into a single string (if it's split across multiple list elements)
+    plan_str = ' '.join(plan)
+
+    # Regular expression to find all action commands
+    action_pattern = re.compile(r"\b(\w+)\('([^']+)'\s*(?:,\s*'([^']+)'|)\)")
+
+    # Find all matches
+    actions = action_pattern.findall(plan_str)
+
+    # Format the actions into the desired string format
+    formatted_actions = [f"{action} {arg1} {arg2}".strip() for action, arg1, arg2 in actions]
+
+    return formatted_actions
+
+
 class ProgPromptPlanner:
     def __init__(self, sim, progprompt_path="/home/liam/dev/llm_task_planning/llm_task_planning/planner/prog_prompt", examples="default"):
         self.sim = sim
@@ -51,7 +77,9 @@ class ProgPromptPlanner:
         self.abstract_planning_time = 0
         self.sim_planning_time = 0
         self.execution_time = 0
+        self.default_args = self.get_default_args()
         openai_interface.setup_openai()
+        self.goal_objects = []
 
     def reset_data(self):
         self.last_failure = ""
@@ -65,9 +93,49 @@ class ProgPromptPlanner:
         self.execution_time = 0
         self.nl_goal = ""
         self.tasks = {}
+        self.goal_objects = []
 
-    def solve(self, args):
-        return self.generate_plan(args)
+    def solve(self, args=None):
+        if args is None:
+            args = self.default_args
+        success = True
+        sim_action_list = self.translate_actions_for_sim(self.generate_plan(args))
+        for action in sim_action_list:
+            sub_suc, msg = self.sim.execute_actions([action], state=self.sim.get_state())
+            self.all_failures.append("" if sub_suc else msg)
+            print(msg)
+        for task in self.tasks:
+            for pred in self.tasks[task]:
+                s, _ = self.sim.check_satisfied(None, pred)
+                success = success and s
+        return success
+
+    def translate_actions_for_sim(self, actions):
+        state = self.sim.get_state()
+
+        for i in range(len(actions)):
+            action, params = parse_instantiated_predicate(actions[i])
+
+            new_action = f"{action}"
+            if action == 'walk':
+                new_action = f"walk_to_object"
+                if any(param in state['room_names'] for param in params):
+                    new_action = f"walk_to_room"
+            for param in params:
+                new_param = param
+                if len(param.split('|')) == 1:
+                    if param in self.goal_objects:
+                        for obj in self.goal_objects:
+                            if param in obj.lower():
+                                new_param = obj
+                    else:
+                        for obj in self.sim.get_graph()['objects']:
+                            if param in obj['objectId'].lower():
+                                new_param = obj['objectId']
+                new_action+=f" {new_param}"
+            actions[i] = new_action
+        print(actions)
+        return actions
 
     def generate_plan(self, args):
         comm = self.sim.comm
@@ -76,7 +144,7 @@ class ProgPromptPlanner:
         obj = list(set([node['class_name'] for node in env_graph["nodes"]]))
 
         # define available actions and append avaailable objects from the env
-        prompt = f"from actions import turnright, turnleft, walkforward, walktowards <obj>, walk <obj>, run <obj>, grab <obj>, switchon <obj>, switchoff <obj>, open <obj>, close <obj>, lookat <obj>, sit <obj>, standup, turnto <obj>, drink <obj>, pointat <obj>, watch <obj>, putin <obj> <obj>, putback <obj> <obj>"
+        prompt = f"from actions import turnright, turnleft, walk <obj>, grab <obj>, switchon <obj>, switchoff <obj>, open <obj>, close <obj>, slice <obj>, putin <obj> <obj>, put <obj> <obj>"
         prompt += f"\n\nobjects = {obj}"
 
         # load train split for task examples
@@ -121,45 +189,57 @@ class ProgPromptPlanner:
                          frequency_penalty=0.15)
             self.all_llm_responses.append(text)
             gen_plan.append(text)
+
             # because codex has query limit per min
             if args.gpt_version == 'code-davinci-002':
                 time.sleep(90)
             # setup logging
-        log_filename = f"{args.expt_name}_{args.prompt_task_examples}_{args.prompt_num_examples}examples"
-        if args.prompt_task_examples_ablation != "none":
-            log_filename += f"_{args.prompt_task_examples_ablation}"
-        log_filename += f"_{args.test_set}"
-        log_file = open(f"{args.progprompt_path}/results/{log_filename}_logs.txt", 'w')
-        log_file.write(f"\n----PROMPT for planning----\n{prompt}\n")
-        actions_taken, all_failures, exec_per_task = run_execution(args,
-                                                                    comm,
-                                                                    self.tasks.keys(),
-                                                                    gen_plan,
-                                                                    log_file)
-        self.actions_taken = actions_taken
-        self.all_failures = all_failures
-        if all(self.check_satisfied(task, self.tasks[task]) for task in self.tasks):
-            return True, 0
-        return False, 0
-    def check_satisfied(self, task, predicates):
-        print(predicates)
-        print(self.tasks)
-        to_remove = []
-        sub_goal = self.tasks[task][0]
-        if sub_goal in predicates:
-            print(f"{sub_goal} SATISFIED!")
-            self.tasks[task].remove(sub_goal)
-            self.completed_goals.append(sub_goal)
-        elif "COOKED" in sub_goal or "WASHED" in sub_goal:
-            relation, params = parse_instantiated_predicate(sub_goal)
-            if f"INSIDE {params[0]} {params[1]}" in predicates and f"ON {params[1]}" in predicates:
-                self.tasks[task].remove(sub_goal)
-        self.goal.append(sub_goal)
-        return len(self.tasks[task]) == 0
+        return translate_plan_to_actions(gen_plan)
 
     def set_goal(self, predicates, task):
         self.tasks[task] = predicates
+        goal_objects = []
+        for goal in self.tasks.values():
+            for pred in goal:
+                rel, params = parse_instantiated_predicate(pred)
+                for param in params:
+                    if "character" in param:
+                        continue
+                    else:
+                        self.goal_objects.append(param)
 
+    def execute_plan(self, plan):
+        pass
+
+    def get_default_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--progprompt-path", type=str,
+                            default="/home/liam/dev/llm_task_planning/llm_task_planning/planner/prog_prompt")
+        parser.add_argument("--expt-name", type=str, default=datetime.now().strftime("%Y%m%d_%H%M%S"))
+
+        parser.add_argument("--gpt-version", type=str, default="gpt-3.5-turbo-1106",
+                            choices=['text-davinci-002', 'davinci', 'code-davinci-002', "gpt-3.5-turbo-1106"])
+        parser.add_argument("--env-id", type=int, default=0)
+        parser.add_argument("--test-set", type=str, default="test_unseen",
+                            choices=['test_unseen', 'test_seen', 'test_unseen_ambiguous', 'env1', 'env2'])
+
+        parser.add_argument("--prompt-task-examples", type=str, default="default",
+                            choices=['default', 'random'])
+        # for random task examples, choose seed
+        parser.add_argument("--seed", type=int, default=0)
+
+        ## NOTE: davinci or older GPT3 versions have a lower token length limit
+        ## check token length limit for models to set prompt size:
+        ## https://platform.openai.com/docs/models
+        parser.add_argument("--prompt-num-examples", type=int, default=3,
+                            choices=range(1, 7))
+        parser.add_argument("--prompt-task-examples-ablation", type=str, default="none",
+                            choices=['none', 'no_comments', "no_feedback", "no_comments_feedback"])
+
+        parser.add_argument("--load-generated-plans", type=bool, default=False)
+
+        args = parser.parse_args()
+        return args
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
