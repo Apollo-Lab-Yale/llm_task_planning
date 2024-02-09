@@ -63,7 +63,7 @@ def translate_plan_to_actions(plan):
 
 
 class ProgPromptPlanner:
-    def __init__(self, sim, progprompt_path="/home/liam/dev/llm_task_planning/llm_task_planning/planner/prog_prompt", examples="default"):
+    def __init__(self, sim, progprompt_path="/home/liam/dev/llm_task_planning/llm_task_planning/planner/prog_prompt", examples="default", num_retries=50):
         self.sim = sim
         self.tasks = {}
         self.actions_taken = []
@@ -77,6 +77,7 @@ class ProgPromptPlanner:
         self.abstract_planning_time = 0
         self.sim_planning_time = 0
         self.execution_time = 0
+        self.num_retries = num_retries
         self.default_args = self.get_default_args()
         openai_interface.setup_openai()
         self.goal_objects = []
@@ -98,17 +99,20 @@ class ProgPromptPlanner:
     def solve(self, args=None):
         if args is None:
             args = self.default_args
-        success = True
-        sim_action_list = self.translate_actions_for_sim(self.generate_plan(args))
-        for action in sim_action_list:
-            sub_suc, msg = self.sim.execute_actions([action], state=self.sim.get_state())
-            self.all_failures.append("" if sub_suc else msg)
-            print(msg)
-        for task in self.tasks:
-            for pred in self.tasks[task]:
-                s, _ = self.sim.check_satisfied(None, pred)
-                success = success and s
-        return success
+        for _ in range(self.num_retries):
+            success = True
+            sim_action_list = self.translate_actions_for_sim(self.generate_plan(args))
+            for action in sim_action_list:
+                sub_suc, msg = self.sim.execute_actions([action], state=self.sim.get_state())
+                self.all_failures.append("" if sub_suc else msg)
+                print(msg)
+            for task in self.tasks:
+                for pred in self.tasks[task]:
+                    s, _ = self.sim.check_satisfied(None, pred)
+                    success = success and s
+            if success:
+                return True, 0
+        return False, 0
 
     def translate_actions_for_sim(self, actions):
         state = self.sim.get_state()
@@ -144,7 +148,7 @@ class ProgPromptPlanner:
         obj = list(set([node['class_name'] for node in env_graph["nodes"]]))
 
         # define available actions and append avaailable objects from the env
-        prompt = f"from actions import turnright, turnleft, walk <obj>, grab <obj>, switchon <obj>, switchoff <obj>, open <obj>, close <obj>, slice <obj>, putin <obj> <obj>, put <obj> <obj>"
+        prompt = f"from actions import turnright, turnleft, walk <obj>, grab <obj>, switchon <obj>, switchoff <obj>, open <obj>, close <obj>, slice <obj>, cut <obj>, putin <obj> <obj>, put <obj> <obj>"
         prompt += f"\n\nobjects = {obj}"
 
         # load train split for task examples
@@ -231,7 +235,7 @@ class ProgPromptPlanner:
         ## NOTE: davinci or older GPT3 versions have a lower token length limit
         ## check token length limit for models to set prompt size:
         ## https://platform.openai.com/docs/models
-        parser.add_argument("--prompt-num-examples", type=int, default=3,
+        parser.add_argument("--prompt-num-examples", type=int, default=7,
                             choices=range(1, 7))
         parser.add_argument("--prompt-task-examples-ablation", type=str, default="none",
                             choices=['none', 'no_comments', "no_feedback", "no_comments_feedback"])

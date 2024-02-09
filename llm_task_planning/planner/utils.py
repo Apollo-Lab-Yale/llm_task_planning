@@ -7,7 +7,7 @@ def extract_actions(text):
     matches = re.findall(pattern, text)
     return [match.replace('$$', '').replace('**', '').split(" ")[1:-1] for match in matches]
 
-
+MSG_FORMAT = "'$$ <action> <object, room, (including id tag) or character> <optional second object> $$'"
 def generate_next_action_prompt_combined(actions, goal_actions, goal, robot_state, previous_failure="", previous_actions = [], relevant_relations=(), item_states=[]):
     prompts = "I am a robot called character acting in a household environment and I need your help selecting my next atomic action from a limited set to move towards my goal."+\
               robot_state
@@ -20,30 +20,40 @@ def generate_next_action_prompt_combined(actions, goal_actions, goal, robot_stat
                 # f"This is how these objects relate to each other: {relevant_relations}"+
     prompts += '\n' + f"NOTE the following actions involve a goal object: {goal_actions}" if len(goal_actions) > 0 else ""
     prompts += '\n' +f"The action scanroom if available allows me to visually scan a room to see if an object is visible. Do not perform consecutive scanroom actions."
-    prompts += f"Of these actions which should I take to move towards my goal of {goal}. include an explaination for your action selection. Please refrain from getting stuck in action loops and provide your selected action in the format '$$ <action> <object, room, (including id tag) or character> <optional second object (including id tag) depending on action> $$."
+    prompts += f"Of these actions which should I take to move towards my goal of {goal}. include an explaination for your action selection. Please refrain from getting stuck in action loops and provide your selected action in the format {MSG_FORMAT}."
     return [prompts]
 
-def generate_next_action_prompt(actions, goal_memory, goal, robot_state, previous_failure="", previous_actions = [], relevant_relations=(), completed_goals=[], scanned_rooms={}):
-    prompts = ["I am a robot called character acting in a household environment and I need your help selecting my next atomic action from a limited set to move towards my goal.",
+def generate_next_action_prompt(actions, goal_memory, goal, robot_state, previous_failure="", previous_actions = [], relevant_relations=None, completed_goals=[], scanned_rooms={}):
+    failure_prompt = []
+    if previous_failure != "":
+        failure_prompt = [previous_failure]
+    prompts = [#"I am a robot called character acting in a household environment and I need your help selecting my next atomic action from a limited set to move towards my goal.",
                robot_state]
     previous_actions = [action for action in previous_actions if action != '']
     if len(completed_goals) > 0:
         prompts += completed_goals
     if len(goal_memory) > 0:
         prompts += [f"The last known predicates of the current goal were: {goal_memory}"]
-    # if previous_failure != "":
-    #     prompts += [previous_failure]
-    # if len(previous_actions) > 0:
-    #     prompts += [f"I have completed the following actions: {previous_actions[-3:]}"]
+
+    if len(previous_actions) > 0:
+        prompts += [f"I have completed the following actions: {previous_actions[-5:]}"]
     # prompts += [f"I have scanned for {obj} in these rooms {scanned_rooms[obj]}" for obj in scanned_rooms]
     prompts += [#f"Right now I can only perform the following actions: {actions}",
                 # f"This is how these objects relate to each other: {relevant_relations}",
                 # f"NOTE the following actions involve a goal object: {goal_actions}" if len(goal_actions) > 0 else "",
-                f"The action scanroom if available allows me to visually scan the room I am currently in to see if an object is visible.", #Do not perform consecutive scanroom actions.",
-               f"Select an action from this list: {actions} to move towards my goal of {goal}? include an explaination for your action selection, only use the object name in your consideration ie '<objectname>|#|#|#'. Please refrain from getting stuck in action loops and provide your selected action in the format 'format '$$ <selected action> $$."]
+                f"The action scanroom if available allows me to visually scan the room I am currently in to see if an object is visible. All actions require the target object to be visible other than scanroom.", #Do not perform consecutive scanroom actions.",
+                f"Some objects may be contained within others that need to be opened and wont be found by scanroom.",
+                #f"select the top Two actions from this list: {actions} that are most likely to help me achieve my goal: {goal}? include an explaination for your action selection, only use the object name in your consideration ie '<objectname>|#|#|#'. Please refrain from getting stuck in action loops and provide your selected action in the format 'format '$$ <selected action> $$."]
+            f"select the the best action from this list: {actions} that is most likely to help me achieve my goal: {goal}? include an explaination for your action selection, only use the object name in your consideration ie '<objectname>|#|#|#'. Please refrain from getting stuck in action loops and provide your selected action in the format 'format '$$ <selected action> $$.",
+            "Please only select actions in the list I provided."]
     if len(goal_memory) > 0:
         prompts += [f"The last known predicates of the current goal were: {goal_memory}"]
-    prompts = [" ".join(prompt for prompt in prompts)]
+    # prompts = [" ".join(prompt for prompt in prompts)]
+    # if relevant_relations is not None:
+    #     prompts += [f"These are the current active predicates as I know them: {relevant_relations}"]
+    if len(failure_prompt) > 0:
+        prompts += failure_prompt
+
     return prompts
 
 def generate_next_action_prompt_short(actions, goal_actions, goal, robot_state, previous_failure="", previous_actions = [], relevant_relations=(), item_states=[]):

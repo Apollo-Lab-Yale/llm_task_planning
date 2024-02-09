@@ -43,6 +43,8 @@
     (cleaning_target ?obj)
     (on ?obj1 - Object ?obj2 - Object)
     (inside ?obj1 ?obj2)
+    (in ?obj1 ?obj2)
+
     (facing ?obj1 - Object ?obj2 - Object)
     (holds_rh ?character - Character ?obj - Object)
     (holds_lh ?character - Character ?obj - Object)
