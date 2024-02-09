@@ -11,7 +11,6 @@ from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomePr
 from pddl.logic import constants, Variable, variables
 from llm_task_planning.test.goal_gen_ff import *
 
-problem_files = ["salmon_cooked_microwave.pddl", "salmon_to_fridge.pddl", "plates_in_cabinet.pddl", "toast_cooked_toaster.pddl", "salmon_cooked_microwave_on_table.pddl"]
 
 sim = AI2ThorSimEnv(scene_index=-1)
 graph = sim.get_graph()

@@ -9,7 +9,7 @@ nlp = spacy.load('en_core_web_md')
 MOVE_ACTION = "walk"
 N_ROOMS = 3
 N_OBJECTS = 5
-MAX_OBJ_HOLD = 2
+MAX_OBJ_HOLD = 1
 
 def check_close(goal_object, object_relations):
     return any([parse_instantiated_predicate(literal)[0] == "CLOSE"
@@ -75,7 +75,7 @@ def resolve_nonvisible(goal, obj_preds, rooms, memory: PlannerMemory):
             elif location["container"] in obj_preds["CLOSE"].intersection(obj_preds["CLOSED"]):
                 actions.append(f"open {location['container']}")
             return actions
-    actions = ["turnleft character", "turnright character"]
+    actions = ["turnleft character", "turnright character", "moveforward", "movebackward", "turnaround", "lookup", "lookdown"]
     for room in rooms:
         actions.append(f"walk_to_room {room}")
     for object in obj_preds['CLOSE'].intersection(obj_preds.get("CAN_OPEN", dict())):
@@ -83,7 +83,7 @@ def resolve_nonvisible(goal, obj_preds, rooms, memory: PlannerMemory):
             actions.append(f"close {object}")
         else:
             actions.append(f"open {object}")
-    for object in obj_preds["FAR"].intersection(obj_preds["CAN_OPEN"]):
+    for object in obj_preds["FAR"].intersection(obj_preds.get("CAN_OPEN", dict())):
         actions.append(f"walk_to_object {object}")
     actions.append(f"scanroom {goal}")
     if goal in memory.object_states:
@@ -97,6 +97,8 @@ def resolve_place_object(obj_preds, rooms):
     actions = []
     for object in obj_preds["HOLDS"]:
         for surface in obj_preds["SURFACES"]:
+            if surface in obj_preds.get("CAN_OPEN", set()) and surface not in obj_preds.get("OPEN", set()):
+                continue
             if surface in obj_preds["CLOSE"]:
                 actions.append(f"put {object} {surface}")
             if surface in obj_preds["FAR"]:
@@ -139,8 +141,11 @@ def resolve_not_ontop(obj1, obj2, obj_preds, rooms, memory = None):
 def resolve_wash_in_sink(obj, sink, faucet, obj_preds, rooms, memory=None):
     if (obj, sink) not in obj_preds['IN']:
         return resolve_not_inside(obj, sink, obj_preds, rooms, memory)
-
-    return resolve_off(faucet, obj_preds, rooms, memory)
+    if faucet not in obj_preds['ON']:
+        return resolve_off(faucet, obj_preds, rooms, memory)
+    if len(obj_preds['HOLDS']) > 0:
+        return resolve_place_object(obj_preds, rooms)
+    return [f"grab {obj}"]
 
 
 
@@ -303,63 +308,64 @@ def get_object_properties_and_states(state):
             object_properties_states["FAR"].add(f"{object['name']}_{object['id']}")
     return object_properties_states
 
-def get_all_valid_actions(state, goals, current_room="", didScanRoom=False):
+def get_all_valid_actions(state, goals, object_properties_states, current_room="", didScanRoom=False):
     goal_objects = set()
-    valid_actions = ["turnleft character", "turnright character"]
+    valid_actions = set()
+    valid_actions.add("turnleft")
+    valid_actions.add("turnright")
     goal_actions = []
-    rooms = [f"{room['class_name']}_{room['id']}" for room in state["rooms"]]
+    rooms =state['room_names']
     for goal in goals:
         relation, params = parse_instantiated_predicate(goal)
         for param in params:
             if param not in rooms and "character" not in param:
                 goal_objects.add(param)
 
-    object_properties_states = get_object_properties_and_states(state)
     for object in object_properties_states["HOLDS"]:
         is_goal = object in goal_objects
         for surface in object_properties_states["SURFACES"].intersection(object_properties_states["CLOSE"]).difference(object_properties_states["HOLDS"]).difference(object_properties_states["CLOSED"]):
-            valid_actions.append(f"put {object} {surface}")
-            if is_goal:
-                goal_actions.append(valid_actions[-1])
+            valid_actions.add(f"put {object} {surface}")
+            # if is_goal:
+            #     goal_actions.append(valid_actions[-1])
     for object in object_properties_states.get("CLOSE", set()):
         is_goal = object in goal_objects
         if object in object_properties_states["HOLDS"]:
             for surface in object_properties_states["SURFACES"].intersection(object_properties_states["CLOSE"]).difference(object_properties_states["CLOSED"]):
-                valid_actions.append(f"put {object} {surface}")
-                if is_goal:
-                    goal_actions.append(valid_actions[-1])
+                valid_actions.add(f"put {object} {surface}")
+                # if is_goal:
+                #     goal_actions.append(valid_actions[-1])
             for storage in object_properties_states["CONTAINERS"].intersection(object_properties_states["CLOSE"]).difference(object_properties_states["CLOSED"]):
-                valid_actions.append(f"putin {object} {storage}")
+                valid_actions.add(f"putin {object} {storage}")
                 if is_goal:
                     goal_actions.append(valid_actions[-1])
         if object in object_properties_states["GRABBABLE"].difference(object_properties_states["HOLDS"]):
-            valid_actions.append(f"grab character {object}")
-            if is_goal:
-                goal_actions.append(valid_actions[-1])
+            valid_actions.add(f"grab character {object}")
+            # if is_goal:
+            #     goal_actions.append(valid_actions[-1])
         if object in object_properties_states["CAN_OPEN"]:
             if object in object_properties_states["OPEN"]:
-                valid_actions.append(f"close character {object}")
+                valid_actions.add(f"close character {object}")
             else:
-                valid_actions.append(f"open character {object}")
-            if is_goal:
-                goal_actions.append(valid_actions[-1])
+                valid_actions.add(f"open character {object}")
+            # if is_goal:
+            #     goal_actions.append(valid_actions[-1])
         if object in object_properties_states["HAS_SWITCH"]:
             if object in object_properties_states["ON"]:
-                valid_actions.append(f"switchoff character {object}")
+                valid_actions.add(f"switchoff character {object}")
             elif object in object_properties_states.get("CLOSED", set()):
-                valid_actions.append(f"switchon character {object}")
-            if is_goal:
-                goal_actions.append(valid_actions[-1])
+                valid_actions.add(f"switchon character {object}")
+            # if is_goal:
+            #     goal_actions.append(valid_actions[-1])
 
     for object in object_properties_states.get("FAR", set()):
         is_goal = object in goal_objects
-        valid_actions.append(f"walk_to_object character {object}")
-        if is_goal:
-            goal_actions.append(valid_actions[-1])
+        valid_actions.add(f"walk_to_object character {object}")
+        # if is_goal:
+        #     goal_actions.append(valid_actions[-1])
 
     for room in rooms:
         if room != current_room:
-            valid_actions.append(f"walk_to_room character {room}")
+            valid_actions.add(f"walk_to_room character {room}")
     goals_in_close = []
     goals_in_far = []
     # for goal in goals:

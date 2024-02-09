@@ -4,12 +4,16 @@ import numpy as np
 import time
 import prior
 from PIL import Image
+import random
+from llm_task_planning.utils.image_saver import SaveImagesThread
 
-from llm_task_planning.sim.ai2_thor.utils import get_visible_objects, get_predicates, CLOSE_DISTANCE, find_closest_position, is_in_room, get_yaw_angle, get_vhome_to_thor_dict, get_inf_floor_polygon
+from llm_task_planning.sim.ai2_thor.utils import get_visible_objects, get_predicates, CLOSE_DISTANCE, find_closest_position, is_in_room, get_yaw_angle, get_vhome_to_thor_dict, get_inf_floor_polygon, \
+    NO_VALID_PUT, Event
 from llm_task_planning.problem.utils import parse_instantiated_predicate
 
 def get_ithor_scene_single_room(room, index = -1):
-    kitchens = [f"FloorPlan{i}" for i in range(1, 31)]
+    broken_rooms = [2, 5, 17, 22]
+    kitchens = [f"FloorPlan{i}" for i in range(1, 31) if i not in broken_rooms]
     living_rooms = [f"FloorPlan{200 + i}" for i in range(1, 31)]
     bedrooms = [f"FloorPlan{300 + i}" for i in range(1, 31)]
     bathrooms = [f"FloorPlan{400 + i}" for i in range(1, 31)]
@@ -23,16 +27,17 @@ def get_ithor_scene_single_room(room, index = -1):
     if "bathroom" in room.lower():
         rooms = bathrooms
     assert len(rooms) > 0
-    index = np.random.uniform(1, 30) if index == -1 else index
-    return rooms[int(index)]
+    return np.random.choice(rooms)
 
 class AI2ThorSimEnv:
-    def __init__(self, scene_index=3, width=600, height=600, gridSize=0.25, visibilityDistance=10, single_room='kitchen'):
+    def __init__(self, scene_index=-1, width=600, height=600, gridSize=0.25, visibilityDistance=20, single_room='kitchen', save_video=False):
         self.single_room = single_room
         self.scene = None
         self.controller = None
         self.comm = self
-        self.reset(scene_index, width, height, gridSize, visibilityDistance, single_room)
+        self.image_saver = None
+        self.save_video = save_video
+        self.reset(scene_index, width, height, gridSize, visibilityDistance, single_room, save_video)
         self.valid_positions = self.get_valid_positions()
         self.object_waypoints = {}
         self.action_fn_from_str = {
@@ -51,25 +56,40 @@ class AI2ThorSimEnv:
             "switchoff": self.turn_object_off,
             "slice": self.slice_object,
             "find": self.cheat_and_find_object,
-            "give-up": self.give_up
+            "give-up": self.give_up,
+            "cut": self.slice_object,
+            "moveforward": self.move_forward,
+            "movebackward": self.move_back,
+            "turnaround": self.turn_around,
+            "lookup": self.look_up,
+            "lookdown": self.look_down
         }
 
-    def reset(self, scene_index=3, width=600, height=600, gridSize=0.25, visibilityDistance=10, single_room='kitchen'):
+    def reset(self, scene_index=-1, width=600, height=600, gridSize=0.25, visibilityDistance=10, single_room='kitchen', save_video=False):
         scene = None
+        self.save_video=save_video
         if scene_index == -1:
             scene = get_ithor_scene_single_room(single_room)
         else:
             dataset = prior.load_dataset("procthor-10k")
             scene = dataset["train"][scene_index]
         self.scene = scene
-        self.controller = Controller(scene=scene, agentMode="default",
-                                     visibilityDistance=visibilityDistance, width=width,
-                                     height=height, allowAutoSimulation=True, gridSize=gridSize)
-        if type(scene) is str:
-            self.scene = {"rooms": [{"roomType": single_room, "floorPolygon": get_inf_floor_polygon()}]}
+        if self.controller is None:
+            self.controller = Controller(scene=scene, agentMode="default",
+                                         visibilityDistance=visibilityDistance, width=width,
+                                         height=height, allowAutoSimulation=True, gridSize=gridSize)
+        self.controller.reset(scene)
+        self.scene = {"rooms": [{"roomType": single_room, "floorPolygon": get_inf_floor_polygon(), "name":scene}]}
+        print(self.scene)
+        if self.save_video:
+            if self.image_saver is not None:
+                self.image_saver.keep_running = False
+            self.image_saver = SaveImagesThread(controller=self.controller)
+            self.image_saver.start()
 
-    def __del__(self):
+    def end_sim(self):
         self.controller.stop()
+        self.image_saver.keep_running = False
 
     def get_object_location(self, object_type):
         objects = self.controller.last_event.metadata['objects']
@@ -78,6 +98,9 @@ class AI2ThorSimEnv:
                 return obj['position']
         return None
 
+    def turn_around(self):
+        act = np.random.choice([self.turn_left, self.turn_right])
+        return act(180)
 
     def get_state(self, goal_objs=None):
         event = self.controller.last_event.metadata
@@ -112,18 +135,22 @@ class AI2ThorSimEnv:
 
     def cheat_and_find_object(self, object):
         print(object)
-        obj = [obj for obj in self.get_graph()['objects'] if object.lower() in obj['objectId'].lower()][0]
-        self.navigate_to_object(obj)
-        self.handle_scan_room(obj['objectId'], memory=None)
+        try:
+            obj = [obj for obj in self.get_graph()['objects'] if object.lower() in obj['objectId'].lower()][0]
+            self.navigate_to_object(obj)
+            self.handle_scan_room(obj['objectId'], memory=None)
+        except Exception as e:
+            print(f"Failed to find object {object}")
+
         return self.controller.last_event
 
     def done(self):
         return self.controller.step(action="Done")
 
-    def turn_left(self, degrees=30):
+    def turn_left(self, degrees=90):
         return self.controller.step("RotateLeft", degrees=degrees)
 
-    def turn_right(self, degrees=30):
+    def turn_right(self, degrees=90):
         return self.controller.step("RotateRight", degrees=degrees)
 
     def look_up(self, degrees=10):
@@ -132,7 +159,7 @@ class AI2ThorSimEnv:
     def look_down(self, degrees=10):
         return self.controller.step("LookDown", degrees=degrees)
 
-    def move_forward(self, meters=0.25):
+    def move_forward(self, meters=1):
         return self.controller.step("MoveAhead", moveMagnitude=meters)
 
     def move_back(self, meters=0.25):
@@ -153,7 +180,8 @@ class AI2ThorSimEnv:
         return self.controller.step(
             action="Teleport",
             position=teleport_pose,
-            rotation={'x': 0.0, "y": np.random.uniform(0, 360), "z": 0.0}
+            rotation={'x': 0.0, "y": np.random.uniform(0, 360), "z": 0.0},
+            forceAction=False
         )
 
     def grab_object(self, object):
@@ -162,8 +190,8 @@ class AI2ThorSimEnv:
                              objectId=object["objectId"],
                              forceAction=False,
                              manualInteract=True)
-        for i in range(100):
-            self.controller.step("MoveHeldObjectBack", moveMagnitude=0.01, forceVisible=True)
+        # for i in range(100):
+        #     self.controller.step("MoveHeldObjectBack", moveMagnitude=0.01, forceVisible=True)
         return ret
 
     def place_object(self, target):
@@ -183,15 +211,17 @@ class AI2ThorSimEnv:
 
     def navigate_to_object(self, object):
         positions = self.get_valid_positions()
-        teleport_pose = find_closest_position(object["position"], object["rotation"], positions, 1.25, facing=False)
+        teleport_pose = find_closest_position(object["position"], object["rotation"], positions, 1.2, facing=False)
         # teleport_pose = np.random.choice(positions)
         assert teleport_pose is not None
-        return self.controller.step(
+        event = self.controller.step(
             action="Teleport",
             position=teleport_pose,
             rotation={'x': 0.0, 'y': get_yaw_angle(teleport_pose,{'y':0.0}, object['position']), 'z': 0.0},
-            forceAction=False
+            forceAction=True
         )
+        self.handle_scan_room(object['objectId'], None)
+        return event
 
     def open_object(self, object):
         event = self.controller.step(
@@ -247,14 +277,14 @@ class AI2ThorSimEnv:
         return  self.controller.step(
             action="DirtyObject",
             objectId=object["objectId"],
-            forceAction=False
+            forceAction=True
         )
 
     def clean_object(self, object):
         return self.controller.step(
             action="CleanObject",
             objectId=object["objectId"],
-            forceAction=False
+            forceAction=True
         )
 
     def fill_with_liquid(self, object, liquid="water"):
@@ -281,8 +311,9 @@ class AI2ThorSimEnv:
 
     def handle_scan_room(self, goal_obj, memory):
         print(f"scanning for object {goal_obj}")
+        action = random.choice([self.turn_left, self.turn_right])
         for i in range(12):
-            self.turn_left(degrees=30)
+            action(degrees=30)
             self.done()
             state = self.get_state()
             if any([goal_obj == object["objectId"] for object in state['objects']]):
@@ -310,7 +341,7 @@ class AI2ThorSimEnv:
         pass
 
     def execute_actions(self, actions, state):
-        event = None
+        event = self.controller.last_event
         for action in actions:
             state = self.get_state()
             act, params = parse_instantiated_predicate(action)
@@ -332,19 +363,21 @@ class AI2ThorSimEnv:
                 object = [obj for obj in state["objects"] if obj["objectId"] == param]
                 object = None if len(object) == 0 else object[0]
                 if object is None and param not in state["room_names"]:
-                    return False, f"Failed to find object {param} to act on."
+                    return False, f"I cannot currently see a {param} to complete action {action}."
                 elif param in state["room_names"]:
                     object = param
                 objects.append(object)
-            event = None
-
-            if len(objects) == 0:
-                event = self.action_fn_from_str[act]()
-            else:
-                target = objects[0] if len(objects) == 1 else objects[1]
-                event = self.action_fn_from_str[act](target)
-                print(event.metadata["lastActionSuccess"], event.metadata['errorMessage'])
-            self.move_back(meters=0.01)
+            event = self.controller.last_event
+            try:
+                if len(objects) == 0:
+                    event = self.action_fn_from_str[act]()
+                else:
+                    target = objects[0] if len(objects) == 1 else objects[1]
+                    event = self.action_fn_from_str[act](target)
+                    print(event.metadata["lastActionSuccess"], event.metadata['errorMessage'])
+                self.move_back(meters=0.01)
+            except Exception as e:
+                print(f"Failed to edecute action {act} due to: {e}")
         return event.metadata["lastActionSuccess"], event.metadata['errorMessage']
 
     def get_world_predicate_set(self, graph, custom_preds=()):
@@ -355,17 +388,38 @@ class AI2ThorSimEnv:
         receptacle = [object for object in state["objects"] if object["objectId"] == receptacle][0]
         return obj in receptacle['receptacleObjectIds']
 
+    def failure_msg_to_blocking_mode(self, msg, action):
+        act, params = parse_instantiated_predicate(action)
+        if msg == NO_VALID_PUT:
+            return f"no-placement {params[1]}"
+        return None
+
+
     def check_satisfied(self, predicates, sub_goal):
         state = self.get_graph()
         to_remove = []
         success = False
         pred, params = parse_instantiated_predicate(sub_goal)
-        if "INSIDE" in sub_goal or "IN" in sub_goal or ("ON" in sub_goal and len(params) == 2):
-            success = self.check_obj_contained(params[0], params[1])
-        elif "WASHED" in pred:
+        if "WASHED" in pred:
+            if "SINK" in pred:
+                faucet_str = params[2]
+                sink_str = params[1]
+                item_str = params[0]
+                faucet = [obj for obj in state['objects'] if obj['objectId'] == faucet_str]
+                sink = [obj for obj in state['objects'] if obj['objectId'] == sink_str]
+
+                if len(faucet) > 0 and len(sink)>0:
+                    faucet = faucet[0]
+                    sink = sink[0]
+
+                    if faucet['isToggled'] and item_str in sink['receptacleObjectIds']:
+                        self.clean_object({"objectId": item_str})
             param = params[0] if "character" not in params[0] else params[1]
             obj = [object for object in state["objects"] if object["objectId"] == param][0]
             success = not obj["isDirty"]
+            print(f"check sat: {obj}")
+        elif "INSIDE" in sub_goal or "IN" in sub_goal or ("ON" in sub_goal and len(params) == 2):
+            success = self.check_obj_contained(params[0], params[1])
         else:
             vhome_to_aithor = get_vhome_to_thor_dict()
 

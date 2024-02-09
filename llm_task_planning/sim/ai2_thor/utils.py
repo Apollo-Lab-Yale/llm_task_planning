@@ -3,6 +3,9 @@ from PIL import Image
 import math
 import numpy as np
 
+NO_VALID_PUT = "No valid positions to place object found"
+
+
 AI2THOR_PREDICATES = [
     'visible',
     'isInteractable',
@@ -47,6 +50,13 @@ AI2THOR_TO_VHOME = {
 
 CLOSE_DISTANCE = 1.75
 
+class Event:
+    def __init__(self):
+        self.metadata = {
+            "lastActionSuccess": "",
+            "errorMessage": ""
+        }
+
 def get_vhome_to_thor_dict():
     vhome_to_thor = {}
     for key, val in AI2THOR_TO_VHOME.items():
@@ -69,6 +79,9 @@ def get_predicates(objects):
                 predicates.append(f"{AI2THOR_TO_VHOME[pred]} {object['objectId']}")
         if object['distance'] < CLOSE_DISTANCE:
             predicates.append(f"close {object['objectId']} character_1")
+        if object['parentReceptacles'] is not None:
+            for container in object["parentReceptacles"]:
+                predicates += [f"IN {object['objectId']} {container}", f"ON {object['objectId']} {container}"]
     return predicates
 
 def is_in_room(point, polygon):
@@ -201,6 +214,12 @@ def get_object_properties_and_states(state):
     object_properties_states["CLOSE"] = {}
     object_properties_states["FAR"] = {}
     object_properties_states["IN"] = {}
+    object_properties_states["INSIDE"] = {}
+
+    object_properties_states["ON_TOP"] = {}
+    object_properties_states["CLOSED"] = {}
+    object_properties_states["CONTAINERS"] = {}
+
     vhome_to_thor = get_vhome_to_thor_dict()
     for obj in state["objects"]:
         is_close = check_close(obj)
@@ -208,15 +227,19 @@ def get_object_properties_and_states(state):
             object_properties_states["CLOSE"][obj["objectId"]] = obj
         else:
             object_properties_states["FAR"][obj["objectId"]] = obj
+        if obj["openable"] and not obj["isOpen"]:
+            object_properties_states["CLOSED"][obj["objectId"]] = obj
         for pred in vhome_to_thor:
             if pred not in object_properties_states:
                 object_properties_states[pred] = {}
-            if pred == "ON_TOP":
-                if obj["parentReceptacles"] is not None and len(obj["parentReceptacles"]):
-                    object_properties_states["ON_TOP"][(obj["objectId"], obj["parentReceptacles"][0])] = obj
-                    object_properties_states["IN"][(obj["objectId"], obj["parentReceptacles"][0])] = obj
             elif obj.get(vhome_to_thor[pred], False):
                 object_properties_states[pred][obj["objectId"]] = obj
+        if obj["receptacleObjectIds"] is not None:
+            for cont_obj in obj['receptacleObjectIds']:
+                object_properties_states["ON_TOP"][(cont_obj, obj["objectId"])] = obj
+                object_properties_states["IN"][(cont_obj, obj['objectId'])] = obj
+                object_properties_states["INSIDE"][(cont_obj, obj['objectId'])] = obj
+
 
     return object_properties_states
 
@@ -249,7 +272,7 @@ def get_yaw_angle(pose1, orientation, pose2):
     x1, y1 = pose1['x'], pose1['z']
     x2, y2 = pose2['x'], pose2['z']
     # Calculate the angle from the first point to the second point
-    angle_to_second_point = math.degrees(math.atan2(y2 - y1, x2 - x1))
+    angle_to_second_point = math.degrees(math.atan2( x2 - x1, y2 - y1))
 
     # Adjust for the orientation of the first point
     relative_angle = angle_to_second_point - orientation['y']

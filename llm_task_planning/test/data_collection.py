@@ -10,12 +10,14 @@ from llm_task_planning.sim.vhome_sim import VirtualHomeSimEnv
 from llm_task_planning.planner.pddl_planner import PDDLPlanner
 from llm_task_planning.planner.prog_prompt.progprompt_planner import ProgPromptPlanner
 # from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
-
+from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 from goal_gen import get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal
-
+from goal_gen_aithor import get_put_apple_in_fridge_goal, get_wash_mug_in_sink_goal, get_make_toast
 # goal_methods = [get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
+goal_methods = [get_put_apple_in_fridge_goal, get_wash_mug_in_sink_goal]
 
-goal_methods = [get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
+
+# goal_methods = [get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
 
 
 def record_data(success, planner : PDDLPlanner, path, run, goals):
@@ -42,10 +44,9 @@ def run_goals(num_runs, goal_fns, planner : PDDLPlanner, directory, current_date
         num_problems += 1
         for i in range(num_runs):
             print("reseting")
-            planner.sim.comm.reset(0)
+            planner.sim.comm.reset()
             print("reset")
             goals, nl_goals = fn(planner.sim)
-            planner.sim.add_character()
             planner.set_goal(deepcopy(goals), deepcopy(nl_goals))
             success, sim_error = planner.solve(args)
             if sim_error < 0:
@@ -59,7 +60,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem", type=str, choices=["all", ""], default="all")
     parser.add_argument("--planner", type=str, choices=["PDDLPlanner", "ProgPrompt", ""], default="PDDLPlanner")
-    parser.add_argument("--num-runs", type=int, default=10)
+    parser.add_argument("--num-runs", type=int, default=20)
     parser.add_argument("--data-path", type=str, default="/home/liam/dev/llm_task_planning/data/data_collection/")
     parser.add_argument("--show-graphics", type=bool, default=False)
     parser.add_argument("--progprompt-path", type=str,
@@ -86,7 +87,7 @@ def main():
                         choices=['none', 'no_comments', "no_feedback", "no_comments_feedback"])
     args = parser.parse_args()
     print("starting sim")
-    sim = VirtualHomeSimEnv(0, no_graphics=not args.show_graphics, port="8080")
+    sim = AI2ThorSimEnv()
     print("sim started")
 
     # problem = VirtualHomeProblem()

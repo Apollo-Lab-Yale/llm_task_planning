@@ -38,4 +38,4 @@ def get_make_toast(sim):
     toaster = [node for node in graph["objects"] if "Toaster" in node["objectId"]][0]
 
     goals = [f"SLICED {bread['objectId']}", f"COOKED {bread['objectId']}|BreadSliced_1 {toaster['objectId']}"]
-    return goals, f"slice the {bread['objectId']}. And cook {bread['objectId']}|BreadSliced_1 in the {toaster['objectId']}"
+    return goals, f"cut the {bread['objectId']}. And cook {bread['objectId']}|BreadSliced_1 in the {toaster['objectId']}"

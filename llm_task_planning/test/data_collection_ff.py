@@ -8,10 +8,10 @@ from copy import deepcopy
 
 from llm_task_planning.sim.vhome_sim import VirtualHomeSimEnv
 from llm_task_planning.planner.contingent_ff.contingent_ff import ContingentFF
+from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 
-from goal_gen import get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal
-
-goal_methods = [get_make_toast_goal, get_put_salmon_in_fridge_goal]
+from goal_gen_ff import get_put_apple_in_fridge_goal_ff, get_wash_mug_in_sink_goal
+goal_methods = [get_put_apple_in_fridge_goal_ff, get_wash_mug_in_sink_goal]
 goal_problems = ["toast_cooked_toaster.pddl", "salmon_to_fridge.pddl"]
 
 def record_data(success, planner : ContingentFF, path, run, goals):
@@ -39,11 +39,10 @@ def run_goals(num_runs, goal_fns, planner : ContingentFF, directory, current_dat
         num_problems += 1
         for i in range(num_runs):
             print("reseting")
-            planner.sim.comm.reset(0)
+            planner.sim.comm.reset()
             print("reset")
-            goals, nl_goals = fn(planner.sim)
-            planner.sim.add_character()
-            planner.set_goal(problem, get_tmp_options(problem, planner.sim), goals, deepcopy(nl_goals))
+            goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal = fn(planner.sim, planner)
+            planner.set_goal(goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal)
             success, sim_error = planner.solve()
             if sim_error < 0:
                 i -= 1
@@ -72,7 +71,7 @@ def main():
     parser.add_argument("--env-id", type=int, default=0)
     args = parser.parse_args()
     print("starting sim")
-    sim = VirtualHomeSimEnv(0, no_graphics=not args.show_graphics, port="8080")
+    sim = AI2ThorSimEnv(scene_index=-1, width=2000, height=1200, save_video=False)
     print("sim started")
 
     # problem = VirtualHomeProblem()

@@ -70,3 +70,21 @@ def get_wash_mug_in_sink_goal(sim, planner):
     sim.make_object_dirty(cup)
     goals = [f"WASHED_SINK {cup['objectId']} {sink['objectId']} {faucet['objectId']}"]
     return goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, f"Wash the {cup['objectId']} with {faucet['objectId']} in the {sink['objectId']}"
+
+def get_make_toast_goal(sim : AI2ThorSimEnv, planner: ContingentFF):
+    graph = sim.get_graph()
+    bread = [node for node in graph["objects"] if "Bread" in node["objectId"]][0]
+    planner.add_placeholder_id(bread)
+    goal_preds_pddl = f"""
+        (sliceable {bread["name"]})\n
+        (inside {bread["name"]} kitchen)\n
+    """
+    goal_pddl = f"""
+        (sliced bread)\n
+    """
+    goal_objects_pddl = f"""
+        {bread['name']} - Object\n
+        kitchen - Room\n
+    """
+    goals = [f"SLICED {bread['objectId']}"]
+    return goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, f"slice the {bread['objectId']}."

@@ -1,0 +1,41 @@
+Status,Planner,Num Actions,Abstract Planning Time,Sim Time,Run,Goals,Unsolved Goals
+False,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,68,71.45817255973816,4.7423365116119385,0,get_put_apple_in_fridge_goal,INSIDE Apple|-00.48|+00.97|+00.41 Fridge|-02.48|+00.00|-00.78
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,7,3.352161407470703,0.2771487236022949,1,get_put_apple_in_fridge_goal,
+False,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,52,13.758540630340576,2.2776215076446533,2,get_put_apple_in_fridge_goal,INSIDE Apple|-01.64|+00.96|+00.50 Fridge|-02.80|+00.00|+04.43
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,10,7.027435064315796,0.4608755111694336,3,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,10,6.547450065612793,0.6214051246643066,4,get_put_apple_in_fridge_goal,
+False,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,59,64.0522301197052,2.785533905029297,5,get_put_apple_in_fridge_goal,INSIDE Apple|-01.09|+00.96|-00.02 Fridge|+00.97|+00.00|+01.25
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,26,25.802273273468018,1.3836920261383057,6,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,36,42.31501770019531,2.0847039222717285,7,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,12,12.395977020263672,0.7394618988037109,8,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,15,14.008187055587769,1.704681158065796,9,get_put_apple_in_fridge_goal,
+False,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,51,7.327153444290161,1.999138355255127,10,get_put_apple_in_fridge_goal,INSIDE Apple|+01.38|+01.04|+03.33 Fridge|+02.04|+00.00|+05.63
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,7,5.445399522781372,0.37048864364624023,11,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,16,13.751612663269043,0.8051693439483643,12,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,8,2.966418504714966,0.4470055103302002,13,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,24,20.495155334472656,1.0721714496612549,14,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,24,9.819463729858398,1.1058642864227295,15,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,12,8.601525068283081,0.5861923694610596,16,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,13,5.523487091064453,0.8756699562072754,17,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,8,6.443101406097412,0.6055264472961426,18,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,20,19.17443609237671,1.007239580154419,19,get_put_apple_in_fridge_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,7,2.667595624923706,0.2780623435974121,0,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,6,1.825174331665039,0.37471890449523926,2,get_wash_mug_in_sink_goal,
+False,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,54,24.621838808059692,3.0889506340026855,4,get_wash_mug_in_sink_goal,WASHED_SINK Mug|+01.45|+00.91|-01.23 Sink|+01.38|+00.81|-01.27|SinkBasin Faucet|+01.31|+00.90|-01.54
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,35,27.517380952835083,2.0243561267852783,6,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,28,25.602052450180054,1.82301926612854,8,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,7,1.734489917755127,0.2503490447998047,10,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,22,14.753348588943481,0.7414705753326416,12,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,5,1.8321940898895264,0.2064511775970459,14,get_wash_mug_in_sink_goal,
+False,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,50,1.7497751712799072,2.124993085861206,16,get_wash_mug_in_sink_goal,WASHED_SINK Mug|-03.15|+00.82|-03.47 Sink|-00.60|+00.93|-03.39|SinkBasin Faucet|-00.39|+00.93|-03.61
+False,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,71,56.541743516922,3.833167314529419,18,get_wash_mug_in_sink_goal,WASHED_SINK Mug|+01.11|+01.04|-01.35 Sink|+00.93|+00.94|+00.32|SinkBasin Faucet|+01.21|+01.03|+00.46
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,4,2.041100025177002,0.36791372299194336,20,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,8,7.914560794830322,0.5191051959991455,22,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,13,10.612228155136108,0.6307334899902344,24,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,24,21.204949855804443,0.7904531955718994,26,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,5,1.293226718902588,0.2715644836425781,28,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,5,0.7580842971801758,0.3701949119567871,30,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,7,3.082683801651001,0.5457758903503418,32,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,4,0.9386200904846191,0.1549396514892578,34,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,13,6.91654109954834,0.48735952377319336,36,get_wash_mug_in_sink_goal,
+True,<class 'llm_task_planning.planner.pddl_planner.PDDLPlanner'>,20,13.428153991699219,1.106865406036377,38,get_wash_mug_in_sink_goal,

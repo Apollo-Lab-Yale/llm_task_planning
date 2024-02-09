@@ -1,5 +1,6 @@
 from llm_task_planning.problem.utils import parse_instantiated_predicate
 from llm_task_planning.sim.ai2_thor.utils import CLOSE_DISTANCE, get_vhome_to_thor_dict
+from llm_task_planning.problem.virtualhome.vh_resolution_tree import resolve_not_holding
 
 MAX_OBJ_HOLD = 1
 PREDICATES = (
@@ -70,3 +71,9 @@ def get_object_properties_and_states(state):
                 object_properties_states[pred][object["objectId"]] = object
 
     return object_properties_states
+
+def resolve_no_placement(target, object_preds):
+    contained = [objs[0] for objs in object_preds.get("IN", set()).union(object_preds.get("ON_TOP", set())).intersection(object_preds.get("GRABBABLE", set())) if objs[1] == target]
+    if len(contained) == 0:
+        return None
+    return f"HOLDS character {contained[0]}"

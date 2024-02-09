@@ -2,9 +2,11 @@
 from simulation.unity_simulator.comm_unity import UnityCommunication
 from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhome, get_object, get_object_by_category, build_state, format_state, UTILITY_SIM_PATH
 from llm_task_planning.problem.utils import parse_instantiated_predicate
+from llm_task_planning.utils.image_saver import SaveImagesThread
 import sys
 import time
 import numpy as np
+
 
 
 class VirtualHomeSimEnv:
