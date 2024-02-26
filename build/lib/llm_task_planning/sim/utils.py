@@ -1,17 +1,11 @@
 import subprocess
 import threading
 import time
-from numba import njit
-from numba.typed import Dict
-import psutil
-import os
-import signal
-from threading import Thread
 import sys
 from copy import deepcopy
 
-UTILITY_SIM_PATH = "/home/liam/installs/virtual_home_exe/linux_exec.v2.2.4.x86_64"
-
+UTILITY_SIM_PATH = "/home/liam/installs/virtual_home_exe/linux_exec.v2.3.0.x86_64"
+UTILITY_SIM_PATH_2_2 = "/home/liam/installs/virtual_home_exe/v2.2.4/linux_exec.v2.2.4.x86_64"
 class SimThread(threading.Thread):
     def __init__(self, *args, **keywords):
         threading.Thread.__init__(self, *args, **keywords)
@@ -129,7 +123,10 @@ def format_state(state, edges, graph):
     formatted_state["predicates"] = []
     formatted_state["object_relations"] = []
     id_map = {}
+    memory_dict = {}
     for edge in edges:
+        # if "FACING" == edge["relation_type"]:
+        #     print(edge)
         if (edge["to_id"] not in id_map or edge["from_id"] not in id_map) and (edge["to_id"] != formatted_state["character"]["id"] and edge["from_id"] != formatted_state["character"]["id"] and "HOLDS" not in edge["relation_type"]):
             continue
         new_node = None
@@ -146,8 +143,15 @@ def format_state(state, edges, graph):
             state.append(new_node)
             new_node = None
         relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
+        if f"{id_map[edge['from_id']]}_{edge['from_id']}" not in memory_dict:
+            memory_dict[f"{id_map[edge['from_id']]}_{edge['from_id']}"] = set()
+        if f"{id_map[edge['to_id']]}_{edge['to_id']}" not in memory_dict:
+            memory_dict[f"{id_map[edge['to_id']]}_{edge['to_id']}"] = set()
+        memory_dict[f"{id_map[edge['to_id']]}_{edge['to_id']}"].add(relation)
+        memory_dict[f"{id_map[edge['from_id']]}_{edge['from_id']}"].add(relation)
         formatted_state["predicates"].append(relation)
         formatted_state["object_relations"].append(relation)
+
     for obj in state:
         new_object = {}
         obj_type = obj["category"].lower()[:-1]
@@ -156,8 +160,11 @@ def format_state(state, edges, graph):
         new_object["type"] = obj_type
         position = (obj["obj_transform"]["position"], obj['obj_transform']["rotation"])
         predicates = []
+        if f"{obj['class_name']}_{obj['id']}" not in memory_dict:
+            memory_dict[f"{obj['class_name']}_{obj['id']}"] = set()
         for pred in obj["properties"]+obj["states"]:
             predicates.append(f"{pred} {obj['class_name']}_{obj['id']}")
+            memory_dict[f"{obj['class_name']}_{obj['id']}"].add(predicates[-1])
         formatted_state["predicates"] += predicates
         new_object["position"] = position
         new_object["bounding_box"] = obj["bounding_box"]
@@ -175,8 +182,15 @@ def format_state(state, edges, graph):
         if edge['from_id'] not in id_map or edge['to_id'] not in id_map:
             continue
         relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
+        if f"{id_map[edge['from_id']]}_{edge['from_id']}" not in memory_dict:
+            memory_dict[f"{id_map[edge['from_id']]}_{edge['from_id']}"] = set()
+        if f"{id_map[edge['to_id']]}_{edge['to_id']}" not in memory_dict:
+            memory_dict[f"{id_map[edge['to_id']]}_{edge['to_id']}"] = set()
+        memory_dict[f"{id_map[edge['to_id']]}_{edge['to_id']}"].add(relation)
+        memory_dict[f"{id_map[edge['from_id']]}_{edge['from_id']}"].add(relation)
         formatted_state["predicates"].append(relation)
         formatted_state["object_relations"].append(relation)
+    formatted_state["memory_dict"] = memory_dict
     return formatted_state
 
 def get_node_from_id(graph, id):
@@ -189,11 +203,13 @@ def get_sim_object(name, nodes, location=None):
 
 def translate_action_for_sim(action : str, state):
     action = action.replace("?", "").split(" ")
+    if action[0] == "open":
+        action = action[:3]
     if "look" in action[0]:
         action[0] = action[0].replace('look', 'turn')
     sim_action = f"<char0> [{action[0]}]"
     for param in action[1:]:
-        if param == "character":
+        if "character" in param:
             continue
         split_param = param.split("_")
         obj_class, id = None, None
@@ -203,7 +219,7 @@ def translate_action_for_sim(action : str, state):
         else:
             obj_class, id = split_param
         object_match = [object for object in state["objects"] if object["name"] == obj_class and object["id"] == int(id)]
-        goal = object_match[0] if len(object_match) > 0 else None
+        goal = {"name": obj_class, "id": id}
         if goal is None:
             room_match = [room for room in state["rooms"] if room["class_name"] == obj_class]
             goal = room_match[0]

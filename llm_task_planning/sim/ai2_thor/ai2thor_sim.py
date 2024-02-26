@@ -8,11 +8,13 @@ import random
 from llm_task_planning.utils.image_saver import SaveImagesThread
 
 from llm_task_planning.sim.ai2_thor.utils import get_visible_objects, get_predicates, CLOSE_DISTANCE, find_closest_position, is_in_room, get_yaw_angle, get_vhome_to_thor_dict, get_inf_floor_polygon, \
-    NO_VALID_PUT, Event
+    NO_VALID_PUT, Event, PUT_COLLISION
 from llm_task_planning.problem.utils import parse_instantiated_predicate
 
 def get_ithor_scene_single_room(room, index = -1):
     broken_rooms = [2, 5, 17, 22]
+    if index > 0:
+        return f"FloorPlan{index}"
     kitchens = [f"FloorPlan{i}" for i in range(1, 31) if i not in broken_rooms]
     living_rooms = [f"FloorPlan{200 + i}" for i in range(1, 31)]
     bedrooms = [f"FloorPlan{300 + i}" for i in range(1, 31)]
@@ -30,13 +32,14 @@ def get_ithor_scene_single_room(room, index = -1):
     return np.random.choice(rooms)
 
 class AI2ThorSimEnv:
-    def __init__(self, scene_index=-1, width=600, height=600, gridSize=0.25, visibilityDistance=20, single_room='kitchen', save_video=False):
+    def __init__(self, scene_index=-1, width=600, height=600, gridSize=0.25, visibilityDistance=20, single_room='kitchen', save_video=False, use_find = False):
         self.single_room = single_room
         self.scene = None
         self.controller = None
         self.comm = self
         self.image_saver = None
         self.save_video = save_video
+        self.use_find = use_find
         self.reset(scene_index, width, height, gridSize, visibilityDistance, single_room, save_video)
         self.valid_positions = self.get_valid_positions()
         self.object_waypoints = {}
@@ -67,9 +70,9 @@ class AI2ThorSimEnv:
 
     def reset(self, scene_index=-1, width=600, height=600, gridSize=0.25, visibilityDistance=10, single_room='kitchen', save_video=False):
         scene = None
-        self.save_video=save_video
-        if scene_index == -1:
-            scene = get_ithor_scene_single_room(single_room)
+        self.save_video = save_video
+        if single_room is not None and single_room != '':
+            scene = get_ithor_scene_single_room(single_room, index=scene_index)
         else:
             dataset = prior.load_dataset("procthor-10k")
             scene = dataset["train"][scene_index]
@@ -89,7 +92,8 @@ class AI2ThorSimEnv:
 
     def end_sim(self):
         self.controller.stop()
-        self.image_saver.keep_running = False
+        if self.image_saver is not None:
+            self.image_saver.keep_running = False
 
     def get_object_location(self, object_type):
         objects = self.controller.last_event.metadata['objects']
@@ -137,15 +141,17 @@ class AI2ThorSimEnv:
         print(object)
         try:
             obj = [obj for obj in self.get_graph()['objects'] if object.lower() in obj['objectId'].lower()][0]
-            self.navigate_to_object(obj)
-            self.handle_scan_room(obj['objectId'], memory=None)
+            if self.use_find:
+                self.navigate_to_object(obj)
+            self.handle_scan_room(obj['objectId'], memory=None, pause_time=0)
         except Exception as e:
             print(f"Failed to find object {object}")
 
         return self.controller.last_event
 
     def done(self):
-        return self.controller.step(action="Done")
+        pass
+        # return self.controller.step(action="Done")
 
     def turn_left(self, degrees=90):
         return self.controller.step("RotateLeft", degrees=degrees)
@@ -195,6 +201,11 @@ class AI2ThorSimEnv:
         return ret
 
     def place_object(self, target):
+        if target['distance'] > CLOSE_DISTANCE:
+            fail_event = Event()
+            fail_event.metadata['lastActionSuccess'] = False
+            fail_event.metadata['errorMessage'] = f"Not close enough to {target['objectId']} to place object."
+            return fail_event
         return self.controller.step(
             action="PutObject",
             objectId=target["objectId"],
@@ -224,6 +235,11 @@ class AI2ThorSimEnv:
         return event
 
     def open_object(self, object):
+        if object['distance'] > CLOSE_DISTANCE:
+            fail_event = Event()
+            fail_event.metadata['lastActionSuccess'] = False
+            fail_event.metadata['errorMessage'] = f"Not close enough to {object['objectId']} to place object."
+            return fail_event
         event = self.controller.step(
             action="OpenObject",
             objectId=object['objectId'],
@@ -235,6 +251,11 @@ class AI2ThorSimEnv:
         return event
 
     def close_object(self, object):
+        if object['distance'] > CLOSE_DISTANCE:
+            fail_event = Event()
+            fail_event.metadata['lastActionSuccess'] = False
+            fail_event.metadata['errorMessage'] = f"Not close enough to {object['objectId']} to place object."
+            return fail_event
         return self.controller.step(
             action="CloseObject",
             objectId=object['objectId'],
@@ -249,6 +270,11 @@ class AI2ThorSimEnv:
         )
 
     def slice_object(self, object):
+        if object['distance'] > CLOSE_DISTANCE:
+            fail_event = Event()
+            fail_event.metadata['lastActionSuccess'] = False
+            fail_event.metadata['errorMessage'] = f"Not close enough to {object['objectId']} to place object."
+            return fail_event
         return self.controller.step(
             action="SliceObject",
             objectId=object["objectId"],
@@ -256,6 +282,11 @@ class AI2ThorSimEnv:
         )
 
     def turn_object_on(self, object):
+        if object['distance'] > CLOSE_DISTANCE:
+            fail_event = Event()
+            fail_event.metadata['lastActionSuccess'] = False
+            fail_event.metadata['errorMessage'] = f"Not close enough to {object['objectId']} to place object."
+            return fail_event
         return self.controller.step(
             action="ToggleObjectOn",
             objectId=object["objectId"],
@@ -263,6 +294,11 @@ class AI2ThorSimEnv:
         )
 
     def turn_object_off(self, object):
+        if object['distance'] > CLOSE_DISTANCE:
+            fail_event = Event()
+            fail_event.metadata['lastActionSuccess'] = False
+            fail_event.metadata['errorMessage'] = f"Not close enough to {object['objectId']} to place object."
+            return fail_event
         return self.controller.step(
             action="ToggleObjectOff",
             objectId=object["objectId"],
@@ -281,6 +317,7 @@ class AI2ThorSimEnv:
         )
 
     def clean_object(self, object):
+
         return self.controller.step(
             action="CleanObject",
             objectId=object["objectId"],
@@ -309,11 +346,12 @@ class AI2ThorSimEnv:
         return self.controller.step(action="DropHandObject",
                              forceAction=False)
 
-    def handle_scan_room(self, goal_obj, memory):
+    def handle_scan_room(self, goal_obj, memory, pause_time = 0.5):
         print(f"scanning for object {goal_obj}")
         action = random.choice([self.turn_left, self.turn_right])
         for i in range(12):
-            action(degrees=30)
+            evt = action(degrees=30)
+            time.sleep(pause_time)
             self.done()
             state = self.get_state()
             if any([goal_obj == object["objectId"] for object in state['objects']]):
@@ -375,7 +413,7 @@ class AI2ThorSimEnv:
                     target = objects[0] if len(objects) == 1 else objects[1]
                     event = self.action_fn_from_str[act](target)
                     print(event.metadata["lastActionSuccess"], event.metadata['errorMessage'])
-                self.move_back(meters=0.01)
+                time.sleep(0.5)
             except Exception as e:
                 print(f"Failed to edecute action {act} due to: {e}")
         return event.metadata["lastActionSuccess"], event.metadata['errorMessage']
@@ -386,11 +424,14 @@ class AI2ThorSimEnv:
     def check_obj_contained(self, obj, receptacle):
         state = self.get_graph()
         receptacle = [object for object in state["objects"] if object["objectId"] == receptacle][0]
+        print(obj)
+        print(receptacle)
+        print(obj in receptacle['receptacleObjectIds'])
         return obj in receptacle['receptacleObjectIds']
 
     def failure_msg_to_blocking_mode(self, msg, action):
         act, params = parse_instantiated_predicate(action)
-        if msg == NO_VALID_PUT:
+        if msg == NO_VALID_PUT or msg == PUT_COLLISION:
             return f"no-placement {params[1]}"
         return None
 
@@ -420,13 +461,25 @@ class AI2ThorSimEnv:
             print(f"check sat: {obj}")
         elif "INSIDE" in sub_goal or "IN" in sub_goal or ("ON" in sub_goal and len(params) == 2):
             success = self.check_obj_contained(params[0], params[1])
+        elif "ACTIVE" in sub_goal:
+            param = sub_goal.split()[1]
+            obj= [object for object in state["objects"] if object["objectId"] == param][0]
+            success  = obj['isToggled']
+        # elif "FILL" in sub_goal:
+        #     objs = [obj for obj in state["objects"] if obj["fillLiquid"] in params]
+        #     success = len(objs) > 0
         else:
             vhome_to_aithor = get_vhome_to_thor_dict()
 
             key = vhome_to_aithor.get(pred, None)
-            assert key is not None
+            if key is None:
+                print(f"failed to find predicate: {pred} ")
+                return False, to_remove
             param = params[0] if "character" not in params[0] else params[1]
-            obj = [object for object in state["objects"] if object["objectId"] ==param][0]
+            obj = [object for object in state["objects"] if object["objectId"] ==param]
+            if len(obj) == 0:
+                return False, to_remove
+            obj = obj[0]
             success = obj[key]
         if success:
             to_remove.append(sub_goal)

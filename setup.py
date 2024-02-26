@@ -20,7 +20,6 @@ setup(
     ],
     python_requires=">=3.6",
     install_requires=[
-        "openai == 0.28.0",
         "virtualhome == 2.3.0"
     ],
 )

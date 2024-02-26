@@ -319,7 +319,12 @@ def evaluate_action_pddl(pddl_str, active_predicates, char, obj1, obj2 = None):
     result = all(evaluations)
     return result
 
-
+MEMORY_PREDICATES = (
+    "INSIDE",
+    # "CLOSE",
+    "OPEN",
+    "CLOSED"
+)
 def parse_pddl_effect(effect_str, nested=False, notted=False):
     # Handle 'and' constructs
     if effect_str.startswith("(false)"):

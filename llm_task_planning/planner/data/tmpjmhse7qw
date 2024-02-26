@@ -1,0 +1,143 @@
+(define (problem template)
+  (:domain virtual-home)
+  (:objects
+    		kitchen - Room 
+		apple_ea10f858 - Object
+		bowl_26a07078 - Object
+		bread_f550157f - Object
+		butterknife_cce72c77 - Object
+		cabinet_a7a3ae61 - Object
+		cabinet_69344178 - Object
+		cabinet_ac7127a8 - Object
+		cabinet_56ad32c5 - Object
+		cabinet_b32e548c - Object
+		cabinet_115b6fac - Object
+		cabinet_d4548b80 - Object
+		cabinet_372fd248 - Object
+		cabinet_33711c56 - Object
+		cabinet_8104c26a - Object
+		cabinet_4188f011 - Object
+		cabinet_740c451a - Object
+		cabinet_dbc5664c - Object
+		cabinet_ab85105f - Object
+		cabinet_d1f6e623 - Object
+		coffeemachine_f54979b2 - Object
+		countertop_2ec5b119 - Object
+		countertop_3a334212 - Object
+		countertop_dd240130 - Object
+		countertop_cf984886 - Object
+		cup_44251a62 - Object
+		dishsponge_7953978d - Object
+		drawer_774be50d - Object
+		drawer_0bb03049 - Object
+		drawer_1eefc4b6 - Object
+		drawer_bfcdd900 - Object
+		egg_9b434f5f - Object
+		faucet_30d2a84f - Object
+		floor_9ad2d7ca - Object
+		fork_01b95cda - Object
+		fridge_bb8487b4 - Object
+		garbagecan_7fad81fa - Object
+		kettle_94676c2b - Object
+		knife_f6957cd2 - Object
+		lettuce_8dc7d46a - Object
+		lightswitch_97674359 - Object
+		microwave_040dd0fc - Object
+		mug_2bb3d8da - Object
+		pan_4d9e9543 - Object
+		papertowelroll_d2d5f79c - Object
+		peppershaker_20b55868 - Object
+		plate_c9cdacad - Object
+		pot_91c2d6ae - Object
+		potato_666ab1aa - Object
+		saltshaker_bc5c5a25 - Object
+		sink_b2d22375 - Object
+		sinkbasin_66dbcbbf - Object
+		soapbottle_cf668319 - Object
+		spatula_2e68091c - Object
+		spoon_e7e6a7d9 - Object
+		stool_dfa1a243 - Object
+		stool_e48aaa1e - Object
+		stoveburner_83d271b6 - Object
+		stoveburner_31815d4e - Object
+		stoveburner_a0fb547f - Object
+		stoveburner_6c7286b0 - Object
+		stoveknob_9bf2d921 - Object
+		stoveknob_5a8b7509 - Object
+		stoveknob_736383ed - Object
+		stoveknob_b156c45b - Object
+		toaster_8f6309d2 - Object
+		tomato_f7fd1342 - Object
+		window_23ea5f58 - Object
+		window_e0e120e4 - Object
+
+        Apple_ea10f858 - Object
+
+        Fridge_bb8487b4 - Object
+
+        kitchen - Room
+
+    
+    character_1 - Character
+  )
+  (:init
+    		(SURFACES cabinet_ac7127a8)
+		(CAN_OPEN cabinet_ac7127a8)
+		(close cabinet_ac7127a8 character_1)
+		(SURFACES cabinet_56ad32c5)
+		(CAN_OPEN cabinet_56ad32c5)
+		(close cabinet_56ad32c5 character_1)
+		(SURFACES cabinet_b32e548c)
+		(CAN_OPEN cabinet_b32e548c)
+		(SURFACES cabinet_115b6fac)
+		(CAN_OPEN cabinet_115b6fac)
+		(SURFACES cabinet_d4548b80)
+		(CAN_OPEN cabinet_d4548b80)
+		(SURFACES cabinet_4188f011)
+		(CAN_OPEN cabinet_4188f011)
+		(close cabinet_4188f011 character_1)
+		(SURFACES countertop_3a334212)
+		(close countertop_3a334212 character_1)
+		(SURFACES fridge_bb8487b4)
+		(CAN_OPEN fridge_bb8487b4)
+		(IN fridge_bb8487b4 floor_9ad2d7ca)
+		(ON fridge_bb8487b4 floor_9ad2d7ca)
+		(SURFACES microwave_040dd0fc)
+		(HAS_SWITCH microwave_040dd0fc)
+		(CAN_OPEN microwave_040dd0fc)
+		(MOVEABLE microwave_040dd0fc)
+		(close microwave_040dd0fc character_1)
+		(IN microwave_040dd0fc countertop_3a334212)
+		(ON microwave_040dd0fc countertop_3a334212)
+		(SURFACES plate_c9cdacad)
+		(GRABBABLE plate_c9cdacad)
+		(IN plate_c9cdacad countertop_3a334212)
+		(ON plate_c9cdacad countertop_3a334212)
+		(GRABBABLE spatula_2e68091c)
+		(close spatula_2e68091c character_1)
+		(IN spatula_2e68091c countertop_3a334212)
+		(ON spatula_2e68091c countertop_3a334212)
+		(SURFACES toaster_8f6309d2)
+		(HAS_SWITCH toaster_8f6309d2)
+		(MOVEABLE toaster_8f6309d2)
+		(close toaster_8f6309d2 character_1)
+		(IN toaster_8f6309d2 countertop_3a334212)
+		(ON toaster_8f6309d2 countertop_3a334212)
+
+        ;(inside Apple_ea10f858 kitchen)
+
+        ;(inside Fridge_bb8487b4 kitchen)
+
+        (closed Fridge_bb8487b4)
+
+        (grabbable Apple_ea10f858)
+
+        (can_open Fridge_bb8487b4)
+
+    
+    (standing character_1)
+  )
+  (:goal (and
+    (inside Apple_ea10f858 Fridge_bb8487b4)
+  ))
+)

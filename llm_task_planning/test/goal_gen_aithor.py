@@ -29,13 +29,13 @@ def get_make_coffee(sim):
     graph = sim.get_graph()
     cup = [node for node in graph["objects"] if "Mug" in node["objectId"] and node['canFillWithLiquid']][0]
     coffee_maker = [node for node in graph["objects"] if "CoffeeMachine" in node["objectId"]][0]
-    goals = [f"ON {coffee_maker['objectId']}", f"ON {cup['objectId']} {coffee_maker['objectId']}", f"HOLDS character {cup['objectId']}"]
-    return goals, f"Fill the {cup['objectId']} with coffee from the {coffee_maker['objectId']}"
+    goals = [f"ON {coffee_maker['objectId']}", f"ON {cup['objectId']} {coffee_maker['objectId']}"]
+    return goals, f"Make coffee in the {cup['objectId']} with coffee from the {coffee_maker['objectId']}"
 
 def get_make_toast(sim):
     graph = sim.get_graph()
     bread = [node for node in graph["objects"] if "Bread" in node["objectId"]][0]
     toaster = [node for node in graph["objects"] if "Toaster" in node["objectId"]][0]
-
+    counter = [node for node in graph["objects"] if "counter" in node["objectId"].lower()][0]
     goals = [f"SLICED {bread['objectId']}", f"COOKED {bread['objectId']}|BreadSliced_1 {toaster['objectId']}"]
-    return goals, f"cut the {bread['objectId']}. And cook {bread['objectId']}|BreadSliced_1 in the {toaster['objectId']}"
+    return goals, f"slice the {bread['objectId']} on the {counter['objectId']}. And cook {bread['objectId']}|BreadSliced_1 in the {toaster['objectId']}"

@@ -1,18 +1,29 @@
-from virtualhome.simulation.unity_simulator.comm_unity import UnityCommunication
+# from virtualhome.simulation.unity_simulator.comm_unity import UnityCommunication
+from simulation.unity_simulator.comm_unity import UnityCommunication
 from llm_task_planning.sim.utils import start_sim, stop_sim, get_characters_vhome, get_object, get_object_by_category, build_state, format_state, UTILITY_SIM_PATH
+from llm_task_planning.problem.utils import parse_instantiated_predicate
+from llm_task_planning.utils.image_saver import SaveImagesThread
 import sys
 import time
+import numpy as np
+
 
 
 class VirtualHomeSimEnv:
-    def __init__(self, env_idm=0, host="127.0.0.1", port="8080", sim=None, no_graphics=False):
-        if sim is None and not no_graphics:
+    def __init__(self, env_idm=1, host="127.0.0.1", port="8080", sim=None, no_graphics=False):
+        if sim is None:
             sim = start_sim()
         self.no_graphics = no_graphics
         self.character_added = False
         self.sim = sim
-        self.comm = UnityCommunication(url=host, port=port, no_graphics=no_graphics, file_name=UTILITY_SIM_PATH)
+        # if not no_graphics:
+        self.comm = UnityCommunication(port=port, no_graphics=no_graphics)#, file_name=UTILITY_SIM_PATH)
+        # else:
+        #     self.comm = UnityCommunication(port=port, no_graphics=no_graphics, file_name=UTILITY_SIM_PATH)
+        self.object_waypoints = {}
         self.comm.fast_reset(env_idm)
+        print(env_idm)
+        self.env_id = env_idm
         self.add_character()
         self.camera_index = self.get_camera_index()
         self.set_view(self.camera_index)
@@ -31,11 +42,22 @@ class VirtualHomeSimEnv:
                 return camera["index"]
         return -1
 
+    def get_item_state_full(self, item_name = "salmon"):
+        graph = self.get_graph()
+        salmon = [obj for obj in graph["nodes"] if obj['class_name']==item_name][0]
+        salmon_id = salmon['id']
+        relations = [relation for relation in graph["edges"] if salmon_id in relation.values()]
+        print("*****************")
+        print(salmon)
+        print(relations)
+        print("*****************")
 
-    def add_character(self, model='Chars/Male1', room="bedroom"):
-        if not self.character_added:
-            self.comm.add_character_camera()
-
+    def add_character(self, model='Chars/Male1', room=None):
+        ROOMS = ["kitchen", "bedroom", "bathroom", "livingroom"]
+        # if not self.character_added:
+        #     self.comm.add_character_camera()
+        if room is None:
+            room = np.random.choice(ROOMS)
         self.comm.add_character(model, initial_room=room)
         self.character_added = True
 
@@ -54,6 +76,7 @@ class VirtualHomeSimEnv:
         return get_object(graph, object_class)
 
     def set_view(self, camera=None):
+        return
         if camera is None:
             camera = self.comm.camera_count()[1] - 1
         self.comm.camera_image([camera])
@@ -63,28 +86,84 @@ class VirtualHomeSimEnv:
             graph = self.get_graph()
         return get_object_by_category(graph, "Room")
 
-    def get_state(self, graph=None):
+    def get_state(self, graph=None, goal_objs=()):
         if graph is None:
             graph = self.get_graph()
         chars = [graph["nodes"][0]]
         rooms = [obj for obj in graph["nodes"] if obj["category"].lower()[:-1] == "room"]
         visible = self.comm.get_visible_objects(self.camera_index)[1]
-        visible_ids = set(visible)
-        visible = [node for node in graph["nodes"] if f"{node['id']}" in visible_ids or node["class_name"] == chars[0]["class_name"]]
-        edges = [edge for edge in graph["edges"] if f"{edge['from_id']}" in visible_ids or f"{edge['to_id']}" in visible_ids or chars[0]["id"] == edge['from_id'] or chars[0]["id"] == edge['to_id']]
-        state = chars + list(visible)
+        visible_ids = set([int(id) for id in visible])
+        add_ids = set()
+        room_ids = [node["id"] for node in graph["nodes"] if node["category"]=="Rooms"]
+        for goal in goal_objs:
+            goal_edges = []
+            name, id = goal.split("_")
+            id = int(id)
+            for edge in graph["edges"]:
+                relation = edge["relation_type"]
+                if id in edge.values() and ((relation == "INSIDE" and edge["to_id"] not in room_ids) or (relation == "CLOSE" and 1 in edge.values())):
+                    goal_edges.append(edge)
+                if any(edge["relation_type"] == "INSIDE" for edge in goal_edges) and any(edge["relation_type"] == "CLOSE" for edge in goal_edges):
+                    container_id = [edge["to_id"] for edge in goal_edges if edge["relation_type"] == "INSIDE"][0]
+                    container = [node for node in graph["nodes"] if node["id"] == container_id][0]
+                    if "OPEN" in container["states"] and "CLOSED" not in container["states"]:
+                        visible_ids.add(int(id))
+                        break
+        for obj in self.object_waypoints:
+            class_name, obj_id = obj.split("_")
+            obj_id = int(obj_id)
+            waypoint_ids = [int(item.split("_")[1]) for item in self.object_waypoints[obj]]
+            if any(w_id in visible_ids for w_id in waypoint_ids):
+                visible_ids.add(obj_id)
+
+        visible = [node for node in graph["nodes"] if node['id'] in visible_ids or node["class_name"] == chars[0]["class_name"]]
+        edges = [edge for edge in graph["edges"] if edge['from_id'] in visible_ids or edge['to_id'] in visible_ids or chars[0]["id"] == edge['from_id']]
+        state = list(visible)
         formatted_state = format_state(state, edges, graph)
         formatted_state["rooms"] = rooms
+        formatted_state["room_names"] = [f"{room['class_name']}_{room['id']}" for room in rooms]
         return formatted_state
 
-    def handle_scan_room(self, goal_object):
+    def handle_scan_room(self, goal_object, memory):
         for i in range(12):
-            self.comm.render_script(["<char0> [turnleft]"])
+            self.comm.render_script(["<char0> [turnleft]"], frame_rate=60)
             time.sleep(0.5)
             state = self.get_state()
-            if any([object["name"].split('_')[0] == goal_object.split("_")[0] for object in state["objects"]]):
+            memory.update_memory(state)
+            if any([f"{object['name']}_{object['id']}" == goal_object or f"{object['name']}_{object['id']}" in self.object_waypoints.get(goal_object, set()) for object in state["objects"]]):
                 return True
         return False
+
+    def translate_action_for_sim(self, action: str, state):
+        action = action.replace("?", "").split(" ")
+        if action[0] == "open":
+            action = action[:3]
+        if "look" in action[0]:
+            action[0] = action[0].replace('look', 'turn')
+        sim_action = f"<char0> [{action[0]}]"
+        for param in action[1:]:
+            if "character" in param:
+                continue
+            split_param = param.split("_")
+            obj_class, id = None, None
+            if len(split_param) <= 1:
+                matches = [object for object in state["objects"] if object["name"] == split_param[0]]
+                obj_class, id = matches[0]["name"], matches[0]["id"]
+            else:
+                obj_class, id = split_param
+            object_match = [object for object in state["objects"] if
+                            object["name"] == obj_class and object["id"] == int(id)]
+            goal = {"name": obj_class, "id": id}
+            if goal is None:
+                room_match = [room for room in state["rooms"] if room["class_name"] == obj_class]
+                goal = room_match[0]
+                goal["name"] = goal["class_name"]
+            sim_action += f" <{goal['name'].split('_')[0]}> ({goal['id']})"
+        action_list = [sim_action]
+        if "turn" in sim_action:
+            action_list *= 2
+
+        return action_list
 
     def check_cooked(self):
         state = self.get_graph()
@@ -99,4 +178,131 @@ class VirtualHomeSimEnv:
                     cooked.append(edge["from_id"])
         return [node for node in state["nodes"] if node["id"] in cooked]
 
+    def add_item(self, class_name="spoon"):
+        print("in add item")
+        graph = self.get_graph()
+        new_node = {
+            'id': 1000,
+            'class_name': class_name,
+            'states': []
+        }
+        graph["nodes"].insert(0, new_node)
+        print("adding id")
+        self.comm.expand_scene(graph)
+        print("id added")
+        return [node for node in self.get_graph()["nodes"] if node["class_name"] == class_name][-1]
 
+
+    def add_object_waypoint(self, object, waypoint):
+        if object not in self.object_waypoints:
+            self.object_waypoints[object] = set()
+        self.object_waypoints[object].add(waypoint)
+
+    def create_waypoint(self, node, offset=(-0.017001, 1, -0.43), class_name="bellpepper", pose=None):
+        graph = self.get_graph()
+        new_node = {
+            'id': 1000,
+            'class_name': class_name,
+            'states': []
+        }
+        graph["nodes"].append(new_node)
+        print("adding id")
+        self.comm.fast_reset(self.env_id)
+        success, msg = self.comm.expand_scene(graph, randomize=True)
+        print(f"Expand graph :{success}, msg: {msg}")
+        graph = self.get_graph()
+        index = [i for i in range(len(graph["nodes"])) if graph["nodes"][i]["class_name"] == class_name]
+        index = index[-1]
+        new_pose = node["obj_transform"]["position"]
+        new_pose = (new_pose[0] + offset[0], new_pose[1] + offset[1], new_pose[2] + offset[2])
+        if pose is None:
+            pose = new_pose
+        graph["nodes"][index]["obj_transform"]["position"] = pose
+        self.comm.fast_reset(self.env_id)
+        success, msg = self.comm.expand_scene(graph)
+        print(f"Expand graph :{success}, msg: {msg}")
+        return graph["nodes"][index]
+
+    def put_node1_on_node2(self, node1, node2):
+        graph = self.get_graph()
+        new_edge = {
+            "from_id": node2["id"],
+            "to_id": node1["id"],
+            'relation_type': "ON"
+        }
+        graph["edges"].append(new_edge)
+        self.comm.expand_scene(graph)
+
+    def set_up_cereal_env(self):
+        self.comm.fast_reset(self.env_id)
+
+        graph = self.get_graph()
+        new_node = {
+            'id': 1000,
+            'class_name': "dishbowl",
+            'states': []
+        }
+        cabinet_node = [node for node in graph["nodes"] if node["class_name"] == "microwave"][0]
+        new_edge = {
+            "from_id": 1000,
+            "to_id": cabinet_node["id"],
+            'relation_type': "ON"
+        }
+
+        graph["nodes"].insert(0, new_node)
+        graph["edges"].append(new_edge)
+        # time.sleep(5)
+        print("adding bowl to graph!")
+        self.comm.expand_scene(graph)
+        self.add_character()
+
+        return [node for node in self.get_graph()["nodes"] if node["class_name"] == "dishbowl"][-1]
+
+    def execute_actions(self, actions, state=None):
+        success, msg = self.comm.render_script(actions, frame_rate=60)
+        return success, msg[val]["message"]
+
+    def check_satisfied(self, predicates, sub_goal):
+        to_remove = []
+        if sub_goal in predicates:
+            print(f"{sub_goal} SATISFIED!")
+            to_remove.append(sub_goal)
+        elif "COOKED" in sub_goal or "WASHED" in sub_goal:
+            relation, params = parse_instantiated_predicate(sub_goal)
+            if f"INSIDE {params[0]} {params[1]}" in predicates and f"ON {params[1]}" in predicates:
+                to_remove.append(sub_goal)
+        return len(to_remove) > 0, to_remove
+
+    CHAR_RELATIONS = ("INSIDE", "HOLDS_RH")
+
+    def get_robot_state(self, state, robot="character", relations=CHAR_RELATIONS):
+        robot_state = ""
+        holding = False
+        location = None
+        for literal in state["object_relations"]:
+            if robot in literal:
+                relation, params = parse_instantiated_predicate(literal)
+                if relation in relations:
+                    if relation == "HOLDS_RH":
+                        holding = True
+                        robot_state += f" I am holding {params[1]}."
+                    else:
+                        robot_state += f" I am inside the {params[1]}."
+                        location = params[1].replace('.', '')
+        if not holding:
+            robot_state += " I am not holding anything."
+        return robot_state, location
+
+    def get_world_predicate_set(self, graph, custom_preds=()):
+        predicates = set()
+        id_map = {}
+        for obj in graph["nodes"]:
+            id_map[obj["id"]] = obj['class_name']
+            for pred in obj["properties"] + obj["states"]:
+                predicates.add(f"{pred} {obj['class_name']}_{obj['id']}")
+        for edge in graph["edges"]:
+            relation = f"{edge['relation_type']} {id_map[edge['from_id']]}_{edge['from_id']} {id_map[edge['to_id']]}_{edge['to_id']}"
+            predicates.add(relation)
+        for pred in custom_preds:
+            predicates.add(pred)
+        return predicates

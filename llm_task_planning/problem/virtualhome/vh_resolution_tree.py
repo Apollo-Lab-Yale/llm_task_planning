@@ -5,7 +5,6 @@ from llm_task_planning.planner.planner_memory import PlannerMemory
 from llm_task_planning.problem.utils import parse_instantiated_predicate
 
 
-nlp = spacy.load('en_core_web_md')
 MOVE_ACTION = "walk"
 N_ROOMS = 3
 N_OBJECTS = 5
@@ -109,7 +108,7 @@ def resolve_place_object(obj_preds, rooms):
 
 def resolve_not_holding(goal, obj_preds, rooms, memory = None):
     actions = []
-    if len(obj_preds["HOLDS"]) == MAX_OBJ_HOLD:
+    if len(obj_preds["HOLDS"]):
         return resolve_place_object(obj_preds, rooms)
     if goal not in obj_preds["CLOSE"] :
         return resolve_nonvisible(goal, obj_preds, rooms, memory)
@@ -172,7 +171,7 @@ def resolve_not_sliced(obj1, obj_preds, rooms, memory = None):
 
 """
 """
-def resolve_cooked(obj1, obj2, obj_preds, rooms, memory = None):
+def resolve_cooked(obj1, obj2, obj_preds, rooms, memory = None, obj3 = None):
     """Returns a set of actions for progressing through a cooking task
 
         Parameters:
@@ -187,9 +186,15 @@ def resolve_cooked(obj1, obj2, obj_preds, rooms, memory = None):
 
        """
     print("resolve not cooked")
+    if obj3 is not None:
+        if (obj3, obj2) not in obj_preds["ON_TOP"]:
+            return resolve_not_ontop(obj3, obj2, obj_preds, rooms, memory)
+        if (obj1, obj2) not in obj_preds["IN"]:
+            return resolve_not_inside(obj1, obj2, obj_preds, rooms, memory)
+    else:
+        if (obj1, obj2) not in obj_preds["IN"]:
+            return resolve_not_inside(obj1, obj2, obj_preds, rooms, memory)
 
-    if (obj1, obj2) not in obj_preds["IN"]:
-        return resolve_not_inside(obj1, obj2, obj_preds, rooms, memory)
     if obj2 in obj_preds["CLOSE"]:
         if obj2 not in obj_preds.get("CLOSED", set()) and obj2 in obj_preds.get("CAN_OPEN", set()):
             return [f"close {obj2}"]
@@ -338,7 +343,8 @@ def get_all_valid_actions(state, goals, object_properties_states, current_room="
                 valid_actions.add(f"putin {object} {storage}")
                 if is_goal:
                     goal_actions.append(valid_actions[-1])
-        if object in object_properties_states["GRABBABLE"].difference(object_properties_states["HOLDS"]):
+
+        if object in object_properties_states["GRABBABLE"] and not len(object_properties_states['HOLDS']):
             valid_actions.add(f"grab character {object}")
             # if is_goal:
             #     goal_actions.append(valid_actions[-1])

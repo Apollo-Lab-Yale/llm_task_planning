@@ -10,8 +10,8 @@ from llm_task_planning.sim.vhome_sim import VirtualHomeSimEnv
 from llm_task_planning.planner.contingent_ff.contingent_ff import ContingentFF
 from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 
-from goal_gen_ff import get_put_apple_in_fridge_goal_ff, get_wash_mug_in_sink_goal
-goal_methods = [get_put_apple_in_fridge_goal_ff, get_wash_mug_in_sink_goal]
+from goal_gen_ff import get_put_apple_in_fridge_goal_ff, get_wash_mug_in_sink_goal, get_make_coffee, get_make_toast_goal
+goal_methods = [get_make_toast_goal]
 goal_problems = ["toast_cooked_toaster.pddl", "salmon_to_fridge.pddl"]
 
 def record_data(success, planner : ContingentFF, path, run, goals):
@@ -28,27 +28,29 @@ def record_data(success, planner : ContingentFF, path, run, goals):
     print(planner.all_failures)
     print(planner.all_sub_plans)
     print(len(planner.actions_taken), len(planner.all_sub_plans), len(planner.all_failures))
+    planner.all_sub_plans = [f"{subplan}" for subplan in planner.all_sub_plans]
 
     np.savez(os.path.join(path, f"run_{run}_data"), actions=planner.actions_taken, sub_plans=planner.all_sub_plans, failures=planner.all_failures)
 
 def run_goals(num_runs, goal_fns, planner : ContingentFF, directory, current_datetime, args):
     num_problems = 0
+    test_set = [28, 4, 6, 11, 24]
     for i in range(len(goal_fns)):
         fn = goal_fns[i]
-        problem = goal_problems[i]
         num_problems += 1
         for i in range(num_runs):
-            print("reseting")
-            planner.sim.comm.reset()
-            print("reset")
-            goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal = fn(planner.sim, planner)
-            planner.set_goal(goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal)
-            success, sim_error = planner.solve()
-            if sim_error < 0:
-                i -= 1
-                continue
-            record_data(success, planner, directory, i * num_problems, fn.__name__)
-            planner.reset_data()
+            for scene in test_set:
+                print("reseting")
+                planner.sim.comm.reset(scene_index=scene)
+                print("reset")
+                goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal = fn(planner.sim, planner)
+                planner.set_goal(goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal)
+                success, sim_error = planner.solve()
+                if sim_error < 0:
+                    i -= 1
+                    continue
+                record_data(success, planner, directory, i * num_problems, fn.__name__)
+                planner.reset_data()
 
 def get_tmp_options(problem, sim):
     graph = sim.get_graph()
@@ -64,14 +66,14 @@ def get_tmp_options(problem, sim):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem", type=str, choices=["all", ""], default="all")
-    parser.add_argument("--num-runs", type=int, default=10)
+    parser.add_argument("--num-runs", type=int, default=37)
     parser.add_argument("--data-path", type=str, default="/home/liam/dev/llm_task_planning/data/data_collection/")
     parser.add_argument("--show-graphics", type=bool, default=False)
     parser.add_argument("--expt-name", type=str, default=datetime.now().strftime("%Y%m%d_%H%M%S"))
     parser.add_argument("--env-id", type=int, default=0)
     args = parser.parse_args()
     print("starting sim")
-    sim = AI2ThorSimEnv(scene_index=-1, width=2000, height=1200, save_video=False)
+    sim = AI2ThorSimEnv(scene_index=-1, width=1000, height=500, save_video=False)
     print("sim started")
 
     # problem = VirtualHomeProblem()

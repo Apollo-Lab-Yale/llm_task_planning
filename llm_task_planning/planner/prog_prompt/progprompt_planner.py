@@ -13,7 +13,7 @@
 This script evaluates plan generation using openAI LLMs
 for the VirtualHome environment tasks
 """
-
+import copy
 import sys
 
 sys.path.append("virtualhome/simulation")
@@ -25,7 +25,7 @@ import os
 import os.path as osp
 import random
 from datetime import datetime
-from llm_task_planning.llm import openai_interface
+from llm_task_planning.llm import openai_interface, OpenAIInterface
 
 # from virtualhome.demo.utils_demo import *
 from llm_task_planning.llm.openai_interface import setup_openai
@@ -71,6 +71,8 @@ class ProgPromptPlanner:
         self.all_llm_responses = []
         self.completed_goals = []
         self.goal = []
+        self.nl_goal = ''
+
         self.all_failures = []
         self.progprompt_path = progprompt_path
         self.examples = examples
@@ -81,6 +83,9 @@ class ProgPromptPlanner:
         self.default_args = self.get_default_args()
         openai_interface.setup_openai()
         self.goal_objects = []
+        self.client = OpenAIInterface()
+        self.max_actions = num_retries
+        self.num_actions = 0
 
     def reset_data(self):
         self.last_failure = ""
@@ -92,6 +97,7 @@ class ProgPromptPlanner:
         self.abstract_planning_time = 0
         self.sim_planning_time = 0
         self.execution_time = 0
+        self.num_actions = 0
         self.nl_goal = ""
         self.tasks = {}
         self.goal_objects = []
@@ -99,19 +105,42 @@ class ProgPromptPlanner:
     def solve(self, args=None):
         if args is None:
             args = self.default_args
+        to_remove = []
         for _ in range(self.num_retries):
+            nl_goal = self.nl_goal[0]
+            temp_goals = copy.deepcopy(self.goal)
+            if self.num_actions > self.max_actions:
+                print(temp_goals)
+                return False, 1
+                break
+            to_remove = []
             success = True
+            start = time.time()
             sim_action_list = self.translate_actions_for_sim(self.generate_plan(args))
+            self.abstract_planning_time += time.time() - start
             for action in sim_action_list:
+                nl_goal = self.nl_goal[0]
+                temp_goals = copy.deepcopy(self.goal)
                 sub_suc, msg = self.sim.execute_actions([action], state=self.sim.get_state())
+                # if sub_suc or "scanroom" in action:
+                self.num_actions += 1
                 self.all_failures.append("" if sub_suc else msg)
+                self.actions_taken.append(action)
                 print(msg)
-            for task in self.tasks:
-                for pred in self.tasks[task]:
-                    s, _ = self.sim.check_satisfied(None, pred)
-                    success = success and s
-            if success:
-                return True, 0
+                to_remove = []
+                for pred in temp_goals:
+                    s, remove = self.sim.check_satisfied(None, pred)
+                    to_remove += remove
+                for pred in to_remove:
+                    temp_goals.remove(pred)
+                if len(temp_goals) == 0:
+                    return  True, 0
+
+
+            print(self.tasks)
+            print(to_remove)
+            # if success:
+            #     return True, 0
         return False, 0
 
     def translate_actions_for_sim(self, actions):
@@ -148,7 +177,7 @@ class ProgPromptPlanner:
         obj = list(set([node['class_name'] for node in env_graph["nodes"]]))
 
         # define available actions and append avaailable objects from the env
-        prompt = f"from actions import turnright, turnleft, walk <obj>, grab <obj>, switchon <obj>, switchoff <obj>, open <obj>, close <obj>, slice <obj>, cut <obj>, putin <obj> <obj>, put <obj> <obj>"
+        prompt = f"from actions import turnright, turnleft, walk <obj>, grab <obj>, switchon <obj>, switchoff <obj>, open <obj>, close <obj>, slice <obj>, cut <obj>, putin <obj> <obj>, put <obj> <obj>, find <obj>"
         prompt += f"\n\nobjects = {obj}"
 
         # load train split for task examples
@@ -181,17 +210,19 @@ class ProgPromptPlanner:
             for eg in prompt_egs_keys:
                 prompt += "\n\n" + prompt_egs[eg]
         gen_plan = []
-        for task in self.tasks:
+        for task in [self.nl_goal]:
             print(f"Generating plan for: {task}\n")
             prompt_task = "def {fxn}():".format(fxn='_'.join(task.split(' ')))
             curr_prompt = f"{prompt}\n\n{prompt_task}\n\t"
             self.all_prompts.append(curr_prompt)
             _, text = LM(curr_prompt,
                          args.gpt_version,
+                         self.client,
                          max_tokens=600,
                          stop=["def"],
                          frequency_penalty=0.15)
             self.all_llm_responses.append(text)
+            print(text)
             gen_plan.append(text)
 
             # because codex has query limit per min
@@ -200,7 +231,12 @@ class ProgPromptPlanner:
             # setup logging
         return translate_plan_to_actions(gen_plan)
 
+
+
+
     def set_goal(self, predicates, task):
+        self.goal += predicates
+        self.nl_goal =task
         self.tasks[task] = predicates
         goal_objects = []
         for goal in self.tasks.values():

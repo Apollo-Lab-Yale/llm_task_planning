@@ -7,21 +7,31 @@ from llm_task_planning.sim.vhome_sim import VirtualHomeSimEnv
 from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 from llm_task_planning.sim.utils import get_sim_object
 from llm_task_planning.planner.utils import extract_actions
-from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
 from pddl.logic import constants, Variable, variables
 from llm_task_planning.test.goal_gen_ff import *
 
 
-sim = AI2ThorSimEnv(scene_index=-1)
+sim = AI2ThorSimEnv(scene_index=6, width=680, height=420, save_video=True, use_find=True)
 graph = sim.get_graph()
 state = sim.get_state()
 options = [f"{room}" for room in state['room_names']]
 
+
+sim.image_saver.planner = "ContingentFF"
+
+# NOTE: CHANGE GOAL HERE
+goal = get_make_toast_goal
+
+if sim.save_video:
+    sim.image_saver.goal = goal.__name__.replace("get_", "").replace("_goal", "")
 planner = ContingentFF(sim, options)
-goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal = get_put_apple_in_fridge_goal_ff(sim, planner)
+goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal = goal(sim, planner)
 
 print("got goal")
 planner.set_goal(goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal)
 print("set goal")
 print(planner.solve())
+sim.end_sim()
 print(len(planner.actions_taken))
+print([obj for obj in sim.get_graph()["objects"] if "Fridge" in obj["objectId"]])
+print([obj for obj in sim.get_graph()["objects"] if "Apple" in obj["objectId"]])

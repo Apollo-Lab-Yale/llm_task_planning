@@ -10,7 +10,7 @@ from llm_task_planning.problem.utils import parse_instantiated_predicate, get_ro
 from llm_task_planning.planner.utils import extract_actions, generate_next_action_prompt, parse_response, generate_goal_prompt, generate_cooked_prompt, generate_next_action_prompt_combined, \
     generate_next_action_prompt_short, build_goal_pred_prompt, fix_obj1_on_obj2, pddl_relations_to_nl, MSG_FORMAT
 from llm_task_planning.planner.planner_memory import PlannerMemory
-from llm_task_planning.llm import query_model, setup_openai
+from llm_task_planning.llm import query_model, setup_openai, OpenAIInterface, get_openai_key
 import numpy as np
 import time
 from PIL import Image
@@ -41,6 +41,7 @@ class PDDLPlanner:
         self.nl_goal = []
         self.abstract_state = "I am not sure."
         setup_openai()
+        self.llm_interface = OpenAIInterface()
         self.conversation = []
         self.actions_taken = []
         self.all_prompts = []
@@ -49,7 +50,7 @@ class PDDLPlanner:
         self.last_failure = ""
         self.all_failures = []
         self.max_llm_retry = 5
-        self.max_action_steps = 50
+        self.max_action_steps = 100
         self.abstract_planning_time = 0
         self.sim_planning_time = 0
         self.execution_time = 0
@@ -121,10 +122,13 @@ class PDDLPlanner:
             relevant_relations = None# pddl_relations_to_nl(get_relevant_relations(state["object_relations"], rooms=rooms))
             actions += ["turnleft character", "turnright character", "moveforward", "movebackward", "turnaround",
                         "lookup", "lookdown"]
-            actions = [f"$$ {action} $$" for action in actions]
+            # if use_all_feasible:
+            actions = [action for action in actions if action not in self.last_failure]
+            actions = [f"$$ {action} $$" for action in actions]# if action not in self.last_failure]
             _, goal_objects = parse_instantiated_predicate(sub_goal)
-            goal_memory = [pddl_relations_to_nl(self.memory.object_states[obj]) for obj in goal_objects if obj in self.memory.object_states]
+
             print(self.memory.object_states)
+            goal_memory = [self.memory.object_states[obj] for obj in goal_objects if obj in self.memory.object_states]
             print(goal_objects)
             print(goal_memory)
             print([self.memory.object_states[obj] for obj in goal_objects if obj in self.memory.object_states])
@@ -146,8 +150,13 @@ class PDDLPlanner:
             msg_length = sum(len(message["content"]) for message in self.conversation)
             print(msg_length)
             response = None
-            response = query_model(self.conversation, model_name=self.model_name)
-            self.all_llm_responses.append(response["choices"][0]["message"]["content"])
+            response = self.llm_interface.query_model(self.conversation, model_name=self.model_name)
+            if response is None:
+                continue
+            print(response)
+            # self.all_llm_responses.append(response["choices"][0]["message"]["content"])
+            self.all_llm_responses.append(response.choices[0].message.content)
+
             # try:
             #     response = query_model(self.conversation, model_name=self.model_name, image=Image.fromarray(self.sim.controller.last_event.metadata['frame']))
             #     self.all_llm_responses.append(response["choices"][0]["message"]["content"])
@@ -155,8 +164,8 @@ class PDDLPlanner:
             #     print(f"Failed to get model response: {e}")
             #     continue
             print(response)
-            self.conversation = openai_interface.add_messages_to_conversation([response["choices"][0]["message"]["content"]], "assistant", self.conversation)
-            selected_action = parse_response(response["choices"][0]["message"]["content"])
+            self.conversation = openai_interface.add_messages_to_conversation([response.choices[0].message.content], "assistant", self.conversation)
+            selected_action = parse_response(response.choices[0].message.content)
             if len(selected_action) == 0:
                 self.last_failure = f"I failed to complete the previous action because I failed to parse it. Make sure the action is in the format: {MSG_FORMAT}."
                 continue
@@ -170,6 +179,11 @@ class PDDLPlanner:
     # todo - add failure detection
     def solve(self, args):
         for _ in range(self.max_action_steps):
+            sub_goal = self.goal[0]
+            _, goal_objects = parse_instantiated_predicate(sub_goal)
+            objs = [obj for obj in self.sim.get_graph()['objects'] if obj['objectId'] in sub_goal]
+            if any(obj['isBroken'] for obj in objs):
+                return False, 1
             abstract_planning_start = time.time()
             ret = self.get_next_action()
             self.abstract_planning_time += time.time() - abstract_planning_start
@@ -187,7 +201,10 @@ class PDDLPlanner:
             if "scanroom" in action:
                 print(f"Executing action: {action}")
                 sim_planning_start = time.time()
-                obj = action.split()[-1] if len(action.split()) == 2 else action.split()[-2]
+                try:
+                    obj = action.split()[-1] if len(action.split()) == 2 else action.split()[-2]
+                except Exception as e:
+                    continue
                 success = self.sim.handle_scan_room(obj, self.memory)
                 self.sim_planning_time += time.time() - sim_planning_start
                 if obj not in self.rooms_scanned:
@@ -216,7 +233,7 @@ class PDDLPlanner:
             if satisfied:
                 for sub_goal in to_remove:
                     relation, params = parse_instantiated_predicate(sub_goal)
-                    self.completed_goals.append(f"I successfully completed the pddl goal: {sub_goal}!")
+                    # self.completed_goals.append(f"I successfully completed the pddl goal: {sub_goal}!")
                     self.goal.remove(sub_goal)
             if len(self.goal)==0:
                 print("Task success!")
@@ -232,7 +249,8 @@ class PDDLPlanner:
         print(f"{mode}")
         if mode == "no-placement":
             print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-            new_goal =  resolve_no_placement(params[0], object_preds)
+            new_goal = resolve_no_placement(params[0], self.sim.get_state())
+            print(new_goal)
             if new_goal is not None:
                 self.goal.insert(0, new_goal)
             else:
@@ -249,7 +267,8 @@ class PDDLPlanner:
         for param in params:
             param.replace("?", "")
         if self.blocking_mode is not None:
-            return self.handle_blocking_mode(obj_preds)
+            self.handle_blocking_mode(obj_preds)
+            relation, params = parse_instantiated_predicate(self.goal[0])
         if "HOLDS" in relation:
             return resolve_not_holding(params[1], obj_preds, rooms, self.memory)
         if relation == "INSIDE":
@@ -265,7 +284,8 @@ class PDDLPlanner:
         if relation == "CLOSED":
             return resolve_open(params[0], obj_preds, rooms, self.memory)
         if relation == "COOKED":
-            return resolve_cooked(params[0], params[1], obj_preds, rooms, self.memory)
+            param3 = None if len(params) < 3 else params[2]
+            return resolve_cooked(params[0], params[1], obj_preds, rooms, self.memory, obj3=param3)
         if relation == "WASHED":
             return resolve_wash_obj1_in_obj2(params[0], params[1], obj_preds, rooms, self.memory)
         if relation == "SLICED":
@@ -276,11 +296,15 @@ class PDDLPlanner:
 
     def set_goal(self, goal, nl_goal):
         self.goal = goal
+
         llm_goals = self.query_llm_for_goals(nl_goal)
         if llm_goals is None:
             self.nl_goal = nl_goal
         else:
             self.nl_goal = llm_goals
+
+        # if self.sim.image_saver is not None:
+        #     self.sim.image_saver.goal = nl_goal
 
     def query_llm_for_goals(self, nl_goal):
         goal_query = generate_goal_prompt(nl_goal)

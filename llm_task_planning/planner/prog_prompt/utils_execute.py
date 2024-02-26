@@ -25,6 +25,7 @@ from llm_task_planning.planner.prog_prompt.utils_aug_env import get_obj_ids_for_
 
 def LM(prompt, 
        gpt_version,
+       client,
        max_tokens=128, 
        temperature=0, 
        stop=None, 
@@ -36,14 +37,16 @@ def LM(prompt,
     # more info on parameters here: 
     # https://platform.openai.com/docs/api-reference/completions/create
     if gpt_version == "gpt-3.5-turbo-1106":
-        response = openai.ChatCompletion.create(model=gpt_version, 
+
+        ret = client.client.chat.completions.create(model=gpt_version,
                                         messages=[{"role": "user", "content": prompt}], 
                                         max_tokens=max_tokens, 
                                         temperature=temperature, 
                                         stop=stop, 
                                         # logprobs=logprobs, 
                                         frequency_penalty = frequency_penalty)
-        response["choices"][0]["text"] = response["choices"][0]["message"]["content"]
+        response = {"choices": [{}]}
+        response["choices"][0]["text"] = ret.choices[0].message.content
     else:
         response = openai.Completion.create(model=gpt_version, 
                                         prompt=prompt, 

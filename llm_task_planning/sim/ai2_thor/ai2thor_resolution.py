@@ -72,8 +72,12 @@ def get_object_properties_and_states(state):
 
     return object_properties_states
 
-def resolve_no_placement(target, object_preds):
-    contained = [objs[0] for objs in object_preds.get("IN", set()).union(object_preds.get("ON_TOP", set())).intersection(object_preds.get("GRABBABLE", set())) if objs[1] == target]
-    if len(contained) == 0:
+def resolve_no_placement(target, state):
+    try:
+        obj = [object for object in state['objects'] if object['objectId'] == target][0]
+        contained = obj['receptacleObjectIds']
+        if len(contained) == 0:
+            return None
+        return f"HOLDS character {contained[0]}"
+    except Exception as e:
         return None
-    return f"HOLDS character {contained[0]}"

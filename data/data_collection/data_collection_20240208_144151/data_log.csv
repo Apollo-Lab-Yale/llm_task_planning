@@ -1,9 +1,0 @@
-Status,Planner,Num Actions,Abstract Planning Time,Sim Time,Run,Goals,Unsolved Goals
-True,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,0,0,0,get_wash_mug_in_sink_goal,
-True,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,0,0,1,get_wash_mug_in_sink_goal,
-True,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,0,0,2,get_wash_mug_in_sink_goal,
-True,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,0,0,3,get_wash_mug_in_sink_goal,
-False,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,0,0,4,get_wash_mug_in_sink_goal,
-True,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,0,0,5,get_wash_mug_in_sink_goal,
-True,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,0,0,6,get_wash_mug_in_sink_goal,
-False,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,0,0,7,get_wash_mug_in_sink_goal,

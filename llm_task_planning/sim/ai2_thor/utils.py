@@ -4,7 +4,7 @@ import math
 import numpy as np
 
 NO_VALID_PUT = "No valid positions to place object found"
-
+PUT_COLLISION = "another object's collision is blocking held object from being placed"
 
 AI2THOR_PREDICATES = [
     'visible',
@@ -45,7 +45,8 @@ AI2THOR_TO_VHOME = {
     # 'onTop': 'ON_TOP',
     'moveable': "MOVEABLE",
     "isOpen": 'OPEN',
-    "isSliced": "SLICED"
+    "isSliced": "SLICED",
+    "fillLiquid": "FILLED"
 }
 
 CLOSE_DISTANCE = 1.75
@@ -234,6 +235,8 @@ def get_object_properties_and_states(state):
                 object_properties_states[pred] = {}
             elif obj.get(vhome_to_thor[pred], False):
                 object_properties_states[pred][obj["objectId"]] = obj
+        if obj['fillLiquid'] not in [None, ""]:
+            object_properties_states["FILLED"][(obj["objectId"], obj['fillLiquid'])] = obj
         if obj["receptacleObjectIds"] is not None:
             for cont_obj in obj['receptacleObjectIds']:
                 object_properties_states["ON_TOP"][(cont_obj, obj["objectId"])] = obj

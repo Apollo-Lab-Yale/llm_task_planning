@@ -11,10 +11,12 @@ from llm_task_planning.planner.pddl_planner import PDDLPlanner
 from llm_task_planning.planner.prog_prompt.progprompt_planner import ProgPromptPlanner
 # from llm_task_planning.problem.virtualhome.pddl_virtualhome import VirtualHomeProblem
 from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
-from goal_gen import get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal
-from goal_gen_aithor import get_put_apple_in_fridge_goal, get_wash_mug_in_sink_goal, get_make_toast
+# from goal_gen import get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal
+from goal_gen_aithor import get_put_apple_in_fridge_goal, get_wash_mug_in_sink_goal, get_make_toast, get_make_coffee
 # goal_methods = [get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
-goal_methods = [get_put_apple_in_fridge_goal, get_wash_mug_in_sink_goal]
+# goal_methods = [get_make_coffee, get_put_apple_in_fridge_goal, get_wash_mug_in_sink_goal]
+# goal_methods = [get_wash_mug_in_sink_goal]
+goal_methods = [get_wash_mug_in_sink_goal]
 
 
 # goal_methods = [get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
@@ -27,8 +29,8 @@ def record_data(success, planner : PDDLPlanner, path, run, goals):
         writer = csv.writer(csvfile)
         if not file_exists:
             # Write header if the file does not exist
-            writer.writerow(["Status", "Planner", "Num Actions", "Abstract Planning Time", "Sim Time", "Run", "Goals", "Unsolved Goals"])
-        writer.writerow([success, type(planner), len(planner.actions_taken), planner.abstract_planning_time, planner.sim_planning_time, run, goals, "&".join(list(planner.goal))])
+            writer.writerow(["Status", "Planner", "Num Actions", "Abstract Planning Time", "Sim Time", "Run", "Goals", "Unsolved Goals", "Scene"])
+        writer.writerow([success, type(planner), len(planner.actions_taken), planner.abstract_planning_time, planner.sim_planning_time, run, goals, "&".join(list(planner.goal)), planner.sim.scene['rooms'][0]['name']])
     print(len(planner.actions_taken), len(planner.all_prompts), len(planner.all_llm_responses), len(planner.all_failures))
     print(planner.actions_taken)
     print(planner.all_failures)
@@ -40,32 +42,36 @@ def record_data(success, planner : PDDLPlanner, path, run, goals):
 
 def run_goals(num_runs, goal_fns, planner : PDDLPlanner, directory, current_datetime, args):
     num_problems = 0
+    # test_set = [28, 4, 6, 11, 24]
+    test_set = [8, 20, 25]
     for fn in goal_fns:
         num_problems += 1
         for i in range(num_runs):
-            print("reseting")
-            planner.sim.comm.reset()
-            print("reset")
-            goals, nl_goals = fn(planner.sim)
-            planner.set_goal(deepcopy(goals), deepcopy(nl_goals))
-            success, sim_error = planner.solve(args)
-            if sim_error < 0:
-                i -= 1
-                continue
-            record_data(success, planner, directory, i * num_problems, fn.__name__)
-            planner.reset_data()
+            for scene in test_set:
+                print("reseting")
+                planner.sim.comm.reset(scene_index=scene)
+                print("reset")
+                goals, nl_goals = fn(planner.sim)
+                planner.set_goal(deepcopy(goals), deepcopy(nl_goals))
+                success, sim_error = planner.solve(args)
+                if sim_error < 0:
+                    i -= 1
+                    continue
+                record_data(success, planner, directory, i * num_problems, fn.__name__)
+                planner.reset_data()
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem", type=str, choices=["all", ""], default="all")
-    parser.add_argument("--planner", type=str, choices=["PDDLPlanner", "ProgPrompt", ""], default="PDDLPlanner")
-    parser.add_argument("--num-runs", type=int, default=20)
+    parser.add_argument("--planner", type=str, choices=["PDDLPlanner", "ProgPrompt", ""], default="ProgPrompt")
+    parser.add_argument("--num-runs", type=int, default=13)
     parser.add_argument("--data-path", type=str, default="/home/liam/dev/llm_task_planning/data/data_collection/")
     parser.add_argument("--show-graphics", type=bool, default=False)
     parser.add_argument("--progprompt-path", type=str,
                         default="/home/liam/dev/llm_task_planning/llm_task_planning/planner/prog_prompt")
     parser.add_argument("--expt-name", type=str, default=datetime.now().strftime("%Y%m%d_%H%M%S"))
+    parser.add_argument("--use-find", type=bool, default=True)
 
     parser.add_argument("--gpt-version", type=str, default="gpt-3.5-turbo-1106",
                         choices=['text-davinci-002', 'davinci', 'code-davinci-002', "gpt-3.5-turbo-1106"])
@@ -87,7 +93,7 @@ def main():
                         choices=['none', 'no_comments', "no_feedback", "no_comments_feedback"])
     args = parser.parse_args()
     print("starting sim")
-    sim = AI2ThorSimEnv()
+    sim = AI2ThorSimEnv(use_find=args.use_find)
     print("sim started")
 
     # problem = VirtualHomeProblem()
@@ -100,6 +106,8 @@ def main():
     # Create a new directory with the current datetime
     current_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
     directory_name = f"{args.data_path}/data_collection_{current_datetime}"
+    if not args.use_find:
+        directory_name += "_nofind"
     os.makedirs(directory_name, exist_ok=True)
 
     # Path for the CSV file
