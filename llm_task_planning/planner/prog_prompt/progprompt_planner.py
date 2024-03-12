@@ -63,7 +63,7 @@ def translate_plan_to_actions(plan):
 
 
 class ProgPromptPlanner:
-    def __init__(self, sim, progprompt_path="/home/liam/dev/llm_task_planning/llm_task_planning/planner/prog_prompt", examples="default", num_retries=50):
+    def __init__(self, sim, progprompt_path="/home/liam/dev/llm_task_planning/llm_task_planning/planner/prog_prompt", examples="default", num_retries=100):
         self.sim = sim
         self.tasks = {}
         self.actions_taken = []
@@ -112,13 +112,15 @@ class ProgPromptPlanner:
             if self.num_actions > self.max_actions:
                 print(temp_goals)
                 return False, 1
-                break
             to_remove = []
             success = True
             start = time.time()
             sim_action_list = self.translate_actions_for_sim(self.generate_plan(args))
             self.abstract_planning_time += time.time() - start
             for action in sim_action_list:
+                if self.num_actions > self.max_actions:
+                    print(temp_goals)
+                    return False, 1
                 nl_goal = self.nl_goal[0]
                 temp_goals = copy.deepcopy(self.goal)
                 sub_suc, msg = self.sim.execute_actions([action], state=self.sim.get_state())

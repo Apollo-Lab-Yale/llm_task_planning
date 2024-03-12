@@ -16,10 +16,10 @@ from goal_gen_aithor import get_put_apple_in_fridge_goal, get_wash_mug_in_sink_g
 # goal_methods = [get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
 # goal_methods = [get_make_coffee, get_put_apple_in_fridge_goal, get_wash_mug_in_sink_goal]
 # goal_methods = [get_wash_mug_in_sink_goal]
-goal_methods = [get_wash_mug_in_sink_goal]
+goal_methods = [get_wash_mug_in_sink_goal, get_put_apple_in_fridge_goal, get_make_toast, get_make_coffee]
 
 
-# goal_methods = [get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
+# goal_methods = [get_make_coffee]
 
 
 def record_data(success, planner : PDDLPlanner, path, run, goals):
@@ -42,8 +42,8 @@ def record_data(success, planner : PDDLPlanner, path, run, goals):
 
 def run_goals(num_runs, goal_fns, planner : PDDLPlanner, directory, current_datetime, args):
     num_problems = 0
-    # test_set = [28, 4, 6, 11, 24]
-    test_set = [8, 20, 25]
+    test_set = [28, 4, 6, 11, 24]
+    # test_set = [8, 20, 25]
     for fn in goal_fns:
         num_problems += 1
         for i in range(num_runs):
@@ -71,7 +71,7 @@ def main():
     parser.add_argument("--progprompt-path", type=str,
                         default="/home/liam/dev/llm_task_planning/llm_task_planning/planner/prog_prompt")
     parser.add_argument("--expt-name", type=str, default=datetime.now().strftime("%Y%m%d_%H%M%S"))
-    parser.add_argument("--use-find", type=bool, default=True)
+    parser.add_argument("--use-find", type=bool, default=False)
 
     parser.add_argument("--gpt-version", type=str, default="gpt-3.5-turbo-1106",
                         choices=['text-davinci-002', 'davinci', 'code-davinci-002', "gpt-3.5-turbo-1106"])

@@ -46,8 +46,8 @@ def generate_next_action_prompt(actions, goal_memory, goal, robot_state, previou
                 #f"select the top Two actions from this list: {actions} that are most likely to help me achieve my goal: {goal}? include an explaination for your action selection, only use the object name in your consideration ie '<objectname>|#|#|#'. Please refrain from getting stuck in action loops and provide your selected action in the format 'format '$$ <selected action> $$."]
             f"select the the best action from this list: {actions} that is most likely to help me achieve my goal: {goal}? include an explaination for your action selection, only use the object name in your consideration ie '<objectname>|#|#|#'. Please refrain from getting stuck in action loops and provide your selected action in the format 'format '$$ <selected action> $$.",
             "Please only select actions in the list I provided."]
-    if len(goal_memory) > 0:
-        prompts += [f"The last known predicates of the current goal were: {goal_memory}"]
+    # if len(goal_memory) > 0:
+    #     prompts += [f"The last known predicates of the current goal were: {goal_memory}"]
     # prompts = [" ".join(prompt for prompt in prompts)]
     # if relevant_relations is not None:
     #     prompts += [f"These are the current active predicates as I know them: {relevant_relations}"]

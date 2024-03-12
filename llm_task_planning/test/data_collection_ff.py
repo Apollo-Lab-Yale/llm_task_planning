@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import csv
 import numpy as np
+import uuid
 from copy import deepcopy
 
 
@@ -10,8 +11,8 @@ from llm_task_planning.sim.vhome_sim import VirtualHomeSimEnv
 from llm_task_planning.planner.contingent_ff.contingent_ff import ContingentFF
 from llm_task_planning.sim.ai2_thor.ai2thor_sim import AI2ThorSimEnv
 
-from goal_gen_ff import get_put_apple_in_fridge_goal_ff, get_wash_mug_in_sink_goal, get_make_coffee, get_make_toast_goal
-goal_methods = [get_make_toast_goal]
+from goal_gen_ff import get_put_apple_in_fridge_goal, get_wash_mug_in_sink_goal, get_make_coffee, get_make_toast_goal
+goal_methods = [get_wash_mug_in_sink_goal, get_make_coffee, get_make_toast_goal, get_put_apple_in_fridge_goal]
 goal_problems = ["toast_cooked_toaster.pddl", "salmon_to_fridge.pddl"]
 
 def record_data(success, planner : ContingentFF, path, run, goals):
@@ -30,7 +31,7 @@ def record_data(success, planner : ContingentFF, path, run, goals):
     print(len(planner.actions_taken), len(planner.all_sub_plans), len(planner.all_failures))
     planner.all_sub_plans = [f"{subplan}" for subplan in planner.all_sub_plans]
 
-    np.savez(os.path.join(path, f"run_{run}_data"), actions=planner.actions_taken, sub_plans=planner.all_sub_plans, failures=planner.all_failures)
+    np.savez(os.path.join(path, f"run_{run}_data"), actions=planner.actions_taken, sub_plans=planner.all_sub_plans, failures=planner.all_failures, responses=planner.raw_plan_output)
 
 def run_goals(num_runs, goal_fns, planner : ContingentFF, directory, current_datetime, args):
     num_problems = 0
@@ -39,12 +40,14 @@ def run_goals(num_runs, goal_fns, planner : ContingentFF, directory, current_dat
         fn = goal_fns[i]
         num_problems += 1
         for i in range(num_runs):
+            index = 1;
             for scene in test_set:
                 print("reseting")
                 planner.sim.comm.reset(scene_index=scene)
                 print("reset")
                 goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal = fn(planner.sim, planner)
-                planner.set_goal(goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, nl_goal)
+                planner.set_goal(goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, goal_name=fn.__name__ + uuid.uuid4().__str__().split('-')[0], nl_goal=nl_goal)
+                index += 1
                 success, sim_error = planner.solve()
                 if sim_error < 0:
                     i -= 1
@@ -66,7 +69,7 @@ def get_tmp_options(problem, sim):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem", type=str, choices=["all", ""], default="all")
-    parser.add_argument("--num-runs", type=int, default=37)
+    parser.add_argument("--num-runs", type=int, default=13)
     parser.add_argument("--data-path", type=str, default="/home/liam/dev/llm_task_planning/data/data_collection/")
     parser.add_argument("--show-graphics", type=bool, default=False)
     parser.add_argument("--expt-name", type=str, default=datetime.now().strftime("%Y%m%d_%H%M%S"))

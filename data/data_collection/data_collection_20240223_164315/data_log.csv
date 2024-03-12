@@ -1,4 +1,0 @@
-Status,Planner,Num Actions,Abstract Planning Time,Sim Time,Run,Goals,Unsolved Goals,Scene
-False,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,68,12.148376941680908,0,0,get_wash_mug_in_sink_goal,WASHED_SINK Mug|+01.45|+01.65|-00.52 Sink|+00.16|+00.82|-01.80|SinkBasin Faucet|-00.07|+00.90|-01.94,FloorPlan8
-False,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,67.96178436279297,0,0,get_wash_mug_in_sink_goal,WASHED_SINK Mug|-00.31|+00.75|-02.10 Sink|-00.11|+00.89|-02.01|SinkBasin Faucet|-00.14|+00.90|-02.29,FloorPlan20
-False,<class 'llm_task_planning.planner.prog_prompt.progprompt_planner.ProgPromptPlanner'>,0,59.06734585762024,0,0,get_wash_mug_in_sink_goal,WASHED_SINK Mug|-00.35|+00.12|+01.25 Sink|-01.84|+00.73|+00.34|SinkBasin Faucet|-01.66|+00.81|+00.13,FloorPlan25

@@ -1,4 +1,4 @@
-(define (problem template)
+(define (problem NAME_TEMP)
   (:domain virtual-home)
   (:objects
     OBJECT_TEMP
