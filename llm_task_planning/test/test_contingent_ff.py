@@ -20,7 +20,7 @@ options = [f"{room}" for room in state['room_names']]
 
 
 # NOTE: CHANGE GOAL HERE
-goal = get_put_apple_in_fridge_goal
+goal = get_make_toast_goal
 
 if sim.save_video:
     sim.image_saver.planner = "ContingentFF"
@@ -34,5 +34,5 @@ print("set goal")
 print(planner.solve())
 sim.end_sim()
 print(len(planner.actions_taken))
-print([obj for obj in sim.get_graph()["objects"] if "Fridge" in obj["objectId"]])
+print([obj for obj in sim.get_graph()["objects"] if "bread" in obj["objectId"].lower()])
 print([obj for obj in sim.get_graph()["objects"] if "Apple" in obj["objectId"]])

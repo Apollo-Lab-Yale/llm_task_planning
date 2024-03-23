@@ -64,15 +64,16 @@ def get_clean_kitchen_goal(sim):
     pass
 
 # problem = VirtualHomeProblem()
-sim = AI2ThorSimEnv(scene_index=6, width=680, height=420, save_video=True, use_find=True)
+sim = AI2ThorSimEnv(scene_index=6, width=680, height=420, save_video=False, use_find=True)
 
 # planner = ProgPromptPlanner(sim)
 planner = PDDLPlanner(sim)
-sim.image_saver.planner = "ATR"
+
 
 # NOTE: CHANGE GOAL HERE
 goal = get_wash_mug_in_sink_goal
 if sim.save_video:
+    sim.image_saver.planner = "ATR"
     sim.image_saver.goal = goal.__name__.replace("get_", "").replace("_goal", "")
 parsed_goals, nl_goals = goal(sim)
 print(parsed_goals, nl_goals)

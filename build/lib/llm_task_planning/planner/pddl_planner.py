@@ -205,13 +205,16 @@ class PDDLPlanner:
                     obj = action.split()[-1] if len(action.split()) == 2 else action.split()[-2]
                 except Exception as e:
                     continue
-                success = self.sim.handle_scan_room(obj, self.memory)
+                success, msg = self.sim.handle_scan_room(obj, self.memory)
+                print(f"*********** {msg}")
                 self.sim_planning_time += time.time() - sim_planning_start
                 if obj not in self.rooms_scanned:
                     self.rooms_scanned[obj] = []
                 self.rooms_scanned[obj].append(self.robot_location)
                 if not success:
-                    self.last_failure = f"The action {action} failed. The object is not visible from my current location, do not repeat this action until moving locations."
+                    self.last_failure = f"The action {action} failed. The object is not visible from my current location, do not repeat this action until moving locations." if msg is None or len(msg) == 0 else \
+                        f"I failed to perform action: {action} due to this blocking condition: {msg}"
+                    print(self.last_failure)
                 self.actions_taken.append(action)
                 continue
             sim_action_list = self.sim.translate_action_for_sim(action, state)
@@ -251,7 +254,7 @@ class PDDLPlanner:
             print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
             new_goal = resolve_no_placement(params[0], self.sim.get_state())
             print(new_goal)
-            if new_goal is not None:
+            if new_goal is not None and new_goal not in self.goal:
                 self.goal.insert(0, new_goal)
             else:
                 self.sim.navigate_to_room(target_room_str=self.sim.single_room)

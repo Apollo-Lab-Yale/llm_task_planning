@@ -165,7 +165,6 @@
                         (can_cook ?cont)
                         (can_open ?cont)
                         (has_switch ?cont)
-                        (closed ?cont)
                         (active ?cont)
                       )
         :effect (and

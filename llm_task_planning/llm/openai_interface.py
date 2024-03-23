@@ -106,7 +106,7 @@ class OpenAIInterface:
     def __init__(self):
         self.client = OpenAI(api_key = get_openai_key(), timeout=10)
 
-    def query_model(self, messages, model_name="gpt-3.5-turbo", image=None, N=1, logProbs=False):
+    def query_model(self, messages, model_name="gpt-3.5-turbo-0125", image=None, N=1, logProbs=False):
             """
             Queries an OpenAI model.
             :param prompt: The input prompt for the model.
@@ -149,7 +149,7 @@ class OpenAIInterface:
                     response = self.client.chat.completions.create(
                         model=model_name,
                         messages=messages,
-                        timeout=10,
+                        timeout=60,
                         max_tokens=1000,
                         logprobs=logProbs,
                         temperature = 1)

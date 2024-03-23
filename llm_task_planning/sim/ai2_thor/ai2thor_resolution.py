@@ -78,6 +78,12 @@ def resolve_no_placement(target, state):
         contained = obj['receptacleObjectIds']
         if len(contained) == 0:
             return None
+        target = None
+        for t in contained:
+            if contained['Pickupable']:
+                target = t
+        if target == None:
+            raise "No objects found to move"
         return f"HOLDS character {contained[0]}"
     except Exception as e:
         return None

@@ -16,10 +16,7 @@ from goal_gen_aithor import get_put_apple_in_fridge_goal, get_wash_mug_in_sink_g
 # goal_methods = [get_make_toast_goal, get_put_salmon_in_fridge_goal, get_put_away_plates_goal, get_cook_salmon_in_microwave_goal, get_cook_salmon_in_microwave_put_on_table_goal]
 # goal_methods = [get_make_coffee, get_put_apple_in_fridge_goal, get_wash_mug_in_sink_goal]
 # goal_methods = [get_wash_mug_in_sink_goal]
-goal_methods = [get_wash_mug_in_sink_goal, get_put_apple_in_fridge_goal, get_make_toast, get_make_coffee]
-
-
-# goal_methods = [get_make_coffee]
+goal_methods = [get_put_apple_in_fridge_goal]
 
 
 def record_data(success, planner : PDDLPlanner, path, run, goals):
@@ -41,11 +38,10 @@ def record_data(success, planner : PDDLPlanner, path, run, goals):
     np.savez(os.path.join(path, f"run_{run}_data"), actions=planner.actions_taken, prompts=planner.all_prompts, responses=planner.all_llm_responses, failures=planner.all_failures)
 
 def run_goals(num_runs, goal_fns, planner : PDDLPlanner, directory, current_datetime, args):
-    num_problems = 0
-    test_set = [28, 4, 6, 11, 24]
+    run_index = 84
+    test_set = [4, 6, 11, 24, 28]
     # test_set = [8, 20, 25]
     for fn in goal_fns:
-        num_problems += 1
         for i in range(num_runs):
             for scene in test_set:
                 print("reseting")
@@ -57,15 +53,16 @@ def run_goals(num_runs, goal_fns, planner : PDDLPlanner, directory, current_date
                 if sim_error < 0:
                     i -= 1
                     continue
-                record_data(success, planner, directory, i * num_problems, fn.__name__)
+                record_data(success, planner, directory, run_index, fn.__name__)
+                run_index += 1
                 planner.reset_data()
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem", type=str, choices=["all", ""], default="all")
-    parser.add_argument("--planner", type=str, choices=["PDDLPlanner", "ProgPrompt", ""], default="ProgPrompt")
-    parser.add_argument("--num-runs", type=int, default=13)
+    parser.add_argument("--planner", type=str, choices=["PDDLPlanner", "ProgPrompt", ""], default="PDDLPlanner")
+    parser.add_argument("--num-runs", type=int, default=5)
     parser.add_argument("--data-path", type=str, default="/home/liam/dev/llm_task_planning/data/data_collection/")
     parser.add_argument("--show-graphics", type=bool, default=False)
     parser.add_argument("--progprompt-path", type=str,

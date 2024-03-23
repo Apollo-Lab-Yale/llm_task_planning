@@ -179,6 +179,8 @@ class PDDLPlanner:
     # todo - add failure detection
     def solve(self, args):
         for _ in range(self.max_action_steps):
+            # if self.abstract_planning_time > 600:
+            #     return False, 1
             sub_goal = self.goal[0]
             _, goal_objects = parse_instantiated_predicate(sub_goal)
             objs = [obj for obj in self.sim.get_graph()['objects'] if obj['objectId'] in sub_goal]
@@ -205,7 +207,8 @@ class PDDLPlanner:
                     obj = action.split()[-1] if len(action.split()) == 2 else action.split()[-2]
                 except Exception as e:
                     continue
-                success = self.sim.handle_scan_room(obj, self.memory)
+                success, msg = self.sim.handle_scan_room(obj, self.memory)
+                print(f"*********** {msg}")
                 self.sim_planning_time += time.time() - sim_planning_start
                 if obj not in self.rooms_scanned:
                     self.rooms_scanned[obj] = []

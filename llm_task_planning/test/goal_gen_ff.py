@@ -8,8 +8,8 @@ def get_put_apple_in_fridge_goal(sim : AI2ThorSimEnv, planner: ContingentFF):
     planner.add_placeholder_id(apple)
     planner.add_placeholder_id(fridge)
     goal_preds_pddl = f"""
-        (inside {apple["name"]} kitchen)\n
-        (inside {fridge['name']} kitchen)\n
+        ;(inside {apple["name"]} kitchen)\n
+        ;(inside {fridge['name']} kitchen)\n
         (closed {fridge['name']})\n
         (grabbable {apple["name"]})\n
         (can_open {fridge['name']})\n
@@ -49,9 +49,9 @@ def get_wash_mug_in_sink_goal(sim, planner):
     planner.add_placeholder_id(faucet)
 
     goal_preds_pddl = f"""
-            (inside {cup["name"]} kitchen)\n
-            (inside {sink["name"]} kitchen)\n
-            (inside {faucet["name"]} kitchen)\n
+            ;(inside {cup["name"]} kitchen)\n
+            ;(inside {sink["name"]} kitchen)\n
+            ;(inside {faucet["name"]} kitchen)\n
             (water_source {faucet['name']})\n
             (cleaning_target {sink['name']})\n
             (has_switch {faucet['name']})\n
@@ -59,6 +59,7 @@ def get_wash_mug_in_sink_goal(sim, planner):
             (open {sink['name']})\n
             (off {faucet['name']})\n
             (dirty {cup['name']})\n
+            
         """
     goal_pddl = f"(inside {cup['name']} {sink['name']})\n (ACTIVE {faucet['name']})"
     goal_objects_pddl = f"""
@@ -80,8 +81,8 @@ def get_make_coffee(sim, planner):
     coffee_maker = [node for node in graph["objects"] if "CoffeeMachine" in node["objectId"]][0]
     goals = [f"ACTIVE {coffee_maker['objectId']}", f"INSIDE {cup['objectId']} {coffee_maker['objectId']}"]
     goal_preds_pddl = f"""
-                (inside {cup["name"]} kitchen)\n
-                (inside {coffee_maker["name"]} kitchen)\n
+                ;(inside {cup["name"]} kitchen)\n
+                ;(inside {coffee_maker["name"]} kitchen)\n
                 (has_switch {coffee_maker['name']})\n
                 (grabbable {cup['name']})\n
                 (open {coffee_maker['name']})\n
@@ -107,28 +108,30 @@ def get_make_toast_goal(sim : AI2ThorSimEnv, planner: ContingentFF):
 
     planner.add_placeholder_id(bread)
     planner.add_placeholder_id(toaster)
-
+    print(bread)
     goal_preds_pddl = f"""
         (sliceable {bread["name"]})\n
-        (inside {bread["name"]} kitchen)\n
-        (inside Bread_26_Slice_1 kitchen)\n
-        (inside {toaster["name"]} kitchen)\n
-        (grabbable Bread_26_Slice_1)\n
+        ;(inside {bread["name"]} kitchen)\n
+        ;(inside {bread['assetId']}_Slice_1 kitchen)\n
+        ;(inside {toaster["name"]} kitchen)\n
+        (grabbable {bread['assetId']}_Slice_1)\n
         (open {toaster['name']}) \n
         (can_cook {toaster['name']})\n
         (off {toaster['name']})
         (has_switch {toaster['name']})\n
+        (can_open {toaster["name"]})\n
     """
     goal_pddl = f"""
         (sliced {bread["name"]})\n
-        (INSIDE Bread_26_Slice_1 {toaster['name']})\n
+        (INSIDE {bread['assetId']}_Slice_1 {toaster['name']})\n
         (active {toaster['name']})\n
-        (cooked Bread_26_Slice_1 {toaster['name']})
+        (cooked {bread['assetId']}_Slice_1 {toaster['name'].lower()})
     """
     goal_objects_pddl = f"""
-        {bread['name']} - Object\n
+        {bread['name'].lower()} - Object\n
+        {toaster['name'].lower()} - Object\n
         kitchen - Room\n
-        Bread_26_Slice_1 - Object\n
+        {bread['assetId']}_Slice_1 - Object\n
     """
-    goals = [f"SLICED {bread['objectId']}"]
+    goals = [f"SLICED {bread['objectId']}", f"COOKED {bread['assetId']}_Slice_1 {toaster['name'].lower()}"]
     return goal_objects_pddl, goal_preds_pddl, goal_pddl, goals, f"slice the {bread['objectId']}."

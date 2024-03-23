@@ -20,6 +20,8 @@ def generate_next_action_prompt_combined(actions, goal_actions, goal, robot_stat
                 # f"This is how these objects relate to each other: {relevant_relations}"+
     prompts += '\n' + f"NOTE the following actions involve a goal object: {goal_actions}" if len(goal_actions) > 0 else ""
     prompts += '\n' +f"The action scanroom if available allows me to visually scan a room to see if an object is visible. Do not perform consecutive scanroom actions."
+    prompts += '\n' +f"Moving to a room that you are already in will move you to a different position within the room."
+
     prompts += f"Of these actions which should I take to move towards my goal of {goal}. include an explaination for your action selection. Please refrain from getting stuck in action loops and provide your selected action in the format {MSG_FORMAT}."
     return [prompts]
 
@@ -46,8 +48,8 @@ def generate_next_action_prompt(actions, goal_memory, goal, robot_state, previou
                 #f"select the top Two actions from this list: {actions} that are most likely to help me achieve my goal: {goal}? include an explaination for your action selection, only use the object name in your consideration ie '<objectname>|#|#|#'. Please refrain from getting stuck in action loops and provide your selected action in the format 'format '$$ <selected action> $$."]
             f"select the the best action from this list: {actions} that is most likely to help me achieve my goal: {goal}? include an explaination for your action selection, only use the object name in your consideration ie '<objectname>|#|#|#'. Please refrain from getting stuck in action loops and provide your selected action in the format 'format '$$ <selected action> $$.",
             "Please only select actions in the list I provided."]
-    if len(goal_memory) > 0:
-        prompts += [f"The last known predicates of the current goal were: {goal_memory}"]
+    # if len(goal_memory) > 0:
+    #     prompts += [f"The last known predicates of the current goal were: {goal_memory}"]
     # prompts = [" ".join(prompt for prompt in prompts)]
     # if relevant_relations is not None:
     #     prompts += [f"These are the current active predicates as I know them: {relevant_relations}"]

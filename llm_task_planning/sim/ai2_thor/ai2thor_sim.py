@@ -121,6 +121,7 @@ class AI2ThorSimEnv:
 
     def get_robot_state(self, state, robot = "character", relations=None):
         state = self.get_state()
+        nl_state = ''
         agent_pose = state["robot_state"]["position"]
         robot_room = None
         for room in state["room_names"]:
@@ -129,7 +130,7 @@ class AI2ThorSimEnv:
                 robot_room = room
 
         holding = [obj['objectId'] for obj in state["objects"] if obj["isPickedUp"]]
-        nl_state = f"I am in the {robot_room}."
+        # nl_state = f"I am in the {robot_room}."
         if len(holding) == 0:
             nl_state+= " I am not holding anything."
         else:
@@ -196,8 +197,10 @@ class AI2ThorSimEnv:
                              objectId=object["objectId"],
                              forceAction=False,
                              manualInteract=True)
-        # for i in range(100):
-        #     self.controller.step("MoveHeldObjectBack", moveMagnitude=0.01, forceVisible=True)
+        self.controller.step("MoveHeldObjectUp", moveMagnitude=0.1, forceVisible=True)
+        for i in range(20):
+            self.controller.step("MoveHeldObjectUp", moveMagnitude=0.01, forceVisible=True)
+            ret = self.controller.step("MoveHeldObjectBack", moveMagnitude=0.01, forceVisible=True)
         return ret
 
     def place_object(self, target):
@@ -354,9 +357,12 @@ class AI2ThorSimEnv:
             time.sleep(pause_time)
             self.done()
             state = self.get_state()
+            if not self.controller.last_event.metadata["lastActionSuccess"]:
+                return self.controller.last_event.metadata["lastActionSuccess"], self.controller.last_event.metadata[
+                    "errorMessage"]
             if any([goal_obj == object["objectId"] for object in state['objects']]):
-                return True
-        return False
+                return self.controller.last_event.metadata["lastActionSuccess"], self.controller.last_event.metadata["errorMessage"]
+        return False, self.controller.last_event.metadata["errorMessage"]
 
     def translate_action_for_sim(self, action, state):
         return [action]
@@ -414,6 +420,7 @@ class AI2ThorSimEnv:
                     event = self.action_fn_from_str[act](target)
                     print(event.metadata["lastActionSuccess"], event.metadata['errorMessage'])
                 time.sleep(0.5)
+                self.move_back(0.01)
             except Exception as e:
                 print(f"Failed to edecute action {act} due to: {e}")
         return event.metadata["lastActionSuccess"], event.metadata['errorMessage']

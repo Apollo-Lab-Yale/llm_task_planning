@@ -260,7 +260,7 @@ class ProgPromptPlanner:
         parser.add_argument("--expt-name", type=str, default=datetime.now().strftime("%Y%m%d_%H%M%S"))
 
         parser.add_argument("--gpt-version", type=str, default="gpt-3.5-turbo-1106",
-                            choices=['text-davinci-002', 'davinci', 'code-davinci-002', "gpt-3.5-turbo-1106"])
+                            choices=['text-davinci-002', 'davinci', 'code-davinci-002', "gpt-4-turbo-preview"])
         parser.add_argument("--env-id", type=int, default=0)
         parser.add_argument("--test-set", type=str, default="test_unseen",
                             choices=['test_unseen', 'test_seen', 'test_unseen_ambiguous', 'env1', 'env2'])
